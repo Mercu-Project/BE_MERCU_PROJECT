@@ -13,11 +13,10 @@ const register = async (req, res) => {
             return httpResponse(res, 400, 'Validation error', errors.array());
         }
 
-        const [rows] = await (
-            await db
-        ).execute('SELECT nomor_pegawai FROM users WHERE nomor_pegawai = ?', [
-            nomorPegawai,
-        ]);
+        const [rows] = await db.execute(
+            'SELECT nomor_pegawai FROM users WHERE nomor_pegawai = ?',
+            [nomorPegawai]
+        );
 
         if (rows.length > 0) {
             return httpResponse(res, 400, 'User already exist.');
@@ -25,12 +24,10 @@ const register = async (req, res) => {
 
         const hashed = bcrypt.hashPassword(password);
 
-        await (
-            await db
-        ).execute('INSERT INTO users (nomor_pegawai, password) VALUE (?, ?)', [
-            nomorPegawai,
-            hashed,
-        ]);
+        await db.execute(
+            'INSERT INTO users (nomor_pegawai, password) VALUE (?, ?)',
+            [nomorPegawai, hashed]
+        );
 
         return httpResponse(res, 201, 'User created.');
     } catch (error) {
@@ -47,9 +44,7 @@ const login = async (req, res) => {
             return httpResponse(res, 400, 'validation error', errors.array());
         }
 
-        const [rows] = await (
-            await db
-        ).execute(
+        const [rows] = await db.execute(
             'SELECT id, nomor_pegawai, password FROM users WHERE nomor_pegawai = ?',
             [nomorPegawai]
         );
