@@ -45,16 +45,12 @@ const submitForm = async (req, res) => {
 
         /* Form Validation */
         const [formRows] = await db.execute(
-            'SELECT status, eff_date, end_eff_date FROM forms WHERE id = ?',
+            'SELECT eff_date, end_eff_date FROM forms WHERE id = ?',
             [form_id]
         );
 
         if (formRows.length < 1) {
             return httpResponse(res, httpStatus.NOT_FOUND, 'form not found.');
-        }
-
-        if (formRows[0].status != '1') {
-            return httpResponse(res, httpStatus.FORBIDDEN, 'form is closed.');
         }
 
         const effDate = new Date(formRows[0].eff_date);
