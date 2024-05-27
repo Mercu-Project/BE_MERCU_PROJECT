@@ -3,7 +3,7 @@ const db = require('../config/db');
 const httpStatus = require('http-status');
 const checkValidation = require('../utils/checkValidationResult');
 const { validationResult } = require('express-validator');
-const { validateFileNameFormat } = require('../utils/checkFileName');
+const { removeAllFiles } = require('../utils/fileSystemUtils');
 
 const submitForm = async (req, res) => {
     try {
@@ -28,6 +28,7 @@ const submitForm = async (req, res) => {
         } = req.body;
 
         if (nim !== req.user.username) {
+            removeAllFiles(req.files);
             return httpResponse(res, httpStatus.BAD_REQUEST, 'NIM anda salah');
         }
 
@@ -50,6 +51,7 @@ const submitForm = async (req, res) => {
         );
 
         if (formRows.length < 1) {
+            removeAllFiles(req.files);
             return httpResponse(res, httpStatus.NOT_FOUND, 'form not found.');
         }
 
@@ -57,6 +59,7 @@ const submitForm = async (req, res) => {
         const endEffDate = new Date(formRows[0].end_eff_date);
         const currentDate = new Date();
         if (currentDate < effDate || currentDate > endEffDate) {
+            removeAllFiles(req.files);
             return httpResponse(res, httpStatus.FORBIDDEN, 'form is closed.');
         }
 
@@ -67,6 +70,7 @@ const submitForm = async (req, res) => {
         );
 
         if (lecturerRows.length < 1) {
+            removeAllFiles(req.files);
             return httpResponse(res, httpStatus.NOT_FOUND, 'dosen not found.');
         }
 
@@ -140,6 +144,7 @@ const submitForm = async (req, res) => {
 
         return httpResponse(res, httpStatus.CREATED, 'Data has been saved.');
     } catch (error) {
+        removeAllFiles(req.files);
         return serverErrorResponse(res, error);
     }
 };

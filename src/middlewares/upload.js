@@ -31,16 +31,18 @@ const removeEmptyDir = (dirName) => {
         dirName
     );
     const items = fs.readdirSync(dirPath);
-    items.forEach((item) => {
-        const fullPath = path.join(dirPath, item);
-        const stats = fs.statSync(fullPath);
-        if (stats.isDirectory()) {
-            const subdirItems = fs.readdirSync(fullPath);
-            if (subdirItems.length === 0) {
-                fs.rmdirSync(fullPath);
+    if (items.length > 0) {
+        items.forEach((item) => {
+            const fullPath = path.join(dirPath, item);
+            const stats = fs.statSync(fullPath);
+            if (stats.isDirectory()) {
+                const subdirItems = fs.readdirSync(fullPath);
+                if (subdirItems.length === 0) {
+                    fs.rmdirSync(fullPath);
+                }
             }
-        }
-    });
+        });
+    }
 };
 
 const storage = multer.diskStorage({
