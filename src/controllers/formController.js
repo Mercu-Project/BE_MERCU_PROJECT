@@ -1,12 +1,10 @@
 const { httpResponse, serverErrorResponse } = require('../utils/httpResponse');
 const db = require('../config/db');
 const httpStatus = require('http-status');
-const { ERR_MSG } = require('../utils/constants');
 
 const openForm = async (req, res) => {
     try {
-        const { id } = req.params;
-        const { open_date, close_date } = req.body;
+        const { open_date, close_date, year_id, form_id } = req.body;
 
         /* validasi prodi */
         const [adminRows] = await db.execute(
@@ -18,14 +16,10 @@ const openForm = async (req, res) => {
             return httpResponse(res, httpStatus.FORBIDDEN, 'access denied');
         }
 
-        const [updateForm] = await db.execute(
-            'UPDATE forms SET eff_date = ?, end_eff_date = ? WHERE id = ? AND prodi_id = ?',
-            [open_date, close_date, id, adminRows[0].prodi_id]
+        await db.execute(
+            'INSERT INTO form_academic_years (academic_year_id, form_id, prodi_id, eff_date, end_eff_date) VALUES (?. ?, ?, ?,?)',
+            [year_id, form_id, adminRows[0].prodi_id, open_date, close_date]
         );
-
-        if (updateForm.affectedRows === 0) {
-            throw new Error(ERR_MSG.ID_NOTFOUND_UPD);
-        }
 
         return httpResponse(res, httpStatus.OK, 'Form has been open.');
     } catch (error) {

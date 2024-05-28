@@ -10,6 +10,7 @@ const submitForm = async (req, res) => {
         checkValidation(res, 'Validation errors', validationResult(req));
 
         const {
+            year_id,
             form_id,
             nim,
             nama_lengkap,
@@ -46,8 +47,8 @@ const submitForm = async (req, res) => {
 
         /* Form Validation */
         const [formRows] = await db.execute(
-            'SELECT eff_date, end_eff_date FROM forms WHERE id = ?',
-            [form_id]
+            'SELECT eff_date, end_eff_date FROM form_academic_years WHERE form_id = ? AND academic_year_id = ?',
+            [form_id, year_id]
         );
 
         if (formRows.length < 1) {

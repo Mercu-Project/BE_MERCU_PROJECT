@@ -7,7 +7,7 @@ const checkRole = require('../middlewares/checkRole');
 const { openFormValidator } = require('../validators/formValidator');
 
 router.patch(
-    '/open/:id',
+    '/open',
     auth,
     checkRole('Admin'),
     openFormValidator,
