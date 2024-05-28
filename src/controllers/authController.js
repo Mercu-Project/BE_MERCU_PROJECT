@@ -4,6 +4,7 @@ const bcrypt = require('../utils/bcrypt');
 const db = require('../config/db');
 const { validationResult } = require('express-validator');
 const httpStatus = require('http-status');
+const roleTableConstants = require('../utils/roleTableConstants');
 
 const register = async (req, res) => {
     try {
@@ -74,10 +75,18 @@ const login = async (req, res) => {
             return httpResponse(res, 400, 'Password is incorrect');
         }
 
+        const tbl = roleTableConstants[rows[0].roleName];
+
+        const [nameRows] = await db.execute(
+            `SELECT full_name AS name FROM ${tbl} WHERE user_id = ?`,
+            [rows[0].id]
+        );
+
         const payload = {
             id: rows[0].id,
             username: rows[0].username,
             role: rows[0].roleName,
+            name: nameRows[0].name,
         };
 
         const token = jwt.generateToken(payload);
