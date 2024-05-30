@@ -6,7 +6,7 @@ const auth = require('../middlewares/auth');
 const checkRole = require('../middlewares/checkRole');
 const { openFormValidator } = require('../validators/formValidator');
 
-router.patch(
+router.post(
     '/open',
     auth,
     checkRole('Admin'),
