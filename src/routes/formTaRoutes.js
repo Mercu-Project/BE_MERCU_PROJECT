@@ -28,4 +28,11 @@ router.post(
     FormTA.submitForm
 );
 
+router.get(
+    '/get-submitted-forms',
+    auth,
+    checkRole('Admin'),
+    FormTA.getSubmittedForms
+);
+
 module.exports = router;

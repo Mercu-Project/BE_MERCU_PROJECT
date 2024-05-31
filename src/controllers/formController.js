@@ -84,11 +84,7 @@ const getForms = async (req, res) => {
 
         const [totalRows] = await db.execute(totalQuery, year ? [year] : []);
 
-        const pagination = buildPaginationData(
-            limit,
-            page,
-            totalRows.length // Adjusted to count total number of rows
-        );
+        const pagination = buildPaginationData(limit, page, totalRows.length);
 
         return httpResponse(
             res,
@@ -102,7 +98,46 @@ const getForms = async (req, res) => {
     }
 };
 
+const getOpenedForms = async (req, res) => {
+    try {
+        let { year, form } = req.query;
+
+        const [openedFormRows] = await db.execute(
+            `
+            SELECT 
+                fay.id,
+                CONCAT(ay.academic_year, ' ', ay.semester) AS 'academic_year',
+                f.form_type AS 'category'
+            FROM 
+                form_academic_years fay
+            JOIN 
+                academic_years ay ON fay.academic_year_id = ay.id
+            JOIN 
+                forms f ON fay.form_id = f.id
+            WHERE
+                CURRENT_DATE BETWEEN fay.eff_date AND fay.end_eff_date
+            AND
+                ay.id = ?
+            AND
+                fay.id = ?
+            
+            `,
+            [year, form]
+        );
+
+        return httpResponse(
+            res,
+            httpStatus.OK,
+            'Get opened forms',
+            openedFormRows
+        );
+    } catch (error) {
+        return serverErrorResponse(res, error);
+    }
+};
+
 module.exports = {
     openForm,
     getForms,
+    getOpenedForms,
 };

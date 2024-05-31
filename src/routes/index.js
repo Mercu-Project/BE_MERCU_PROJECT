@@ -7,6 +7,8 @@ const TimeBreakSession = require('./timeBreakSessionRoutes');
 const FormTA = require('./formTaRoutes');
 const Form = require('./formRoutes');
 const AcademicYear = require('./academicYearRoutes');
+const Assign = require('./assignRoutes');
+const Lecturer = require('./lecturerRoutes');
 
 /* Use routes */
 router.use('/user', User);
@@ -15,5 +17,7 @@ router.use('/time-break-session', TimeBreakSession);
 router.use('/form-ta', FormTA);
 router.use('/form', Form);
 router.use('/academic-year', AcademicYear);
+router.use('/assign', Assign);
+router.use('/lecturer', Lecturer);
 
 module.exports = router;

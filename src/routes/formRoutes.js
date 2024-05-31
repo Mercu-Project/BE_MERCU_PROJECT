@@ -14,5 +14,11 @@ router.post(
     Form.openForm
 );
 router.get('/get-forms', auth, checkRole('Admin'), Form.getForms);
+router.get(
+    '/get-opened-forms',
+    auth,
+    checkRole('Mahasiswa'),
+    Form.getOpenedForms
+);
 
 module.exports = router;
