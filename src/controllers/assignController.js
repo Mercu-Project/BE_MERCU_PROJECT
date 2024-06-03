@@ -116,7 +116,64 @@ const assignKoordSidang = async (req, res) => {
     }
 };
 
+const assignRoom = async (req, res) => {
+    try {
+        checkValidation(req, 'validation error', validationResult(req));
+
+        const { room_id, ids } = req.body;
+
+        for (const id of ids) {
+            const [updForm] = await db.execute(
+                'UPDATE form_ta SET room_id = ? WHERE id = ?',
+                [room_id, id]
+            );
+
+            if (updForm.affectedRows === 0) {
+                throw new Error(ERR_MSG.ID_NOTFOUND_UPD);
+            }
+        }
+
+        return httpResponse(res, httpStatus.OK, 'room has been assigned');
+    } catch (error) {
+        return serverErrorResponse(res, error);
+    }
+};
+
+const assignPenguji = async (req, res) => {
+    try {
+        const { penguji_id, ids, penguji_type } = req.body;
+
+        let pengujiSQL = '';
+        if (penguji_type === 'penguji_1') {
+            pengujiSQL = 'penguji_1 = ?';
+        } else if (penguji_type === 'penguji_2') {
+            pengujiSQL = 'penguji_2 = ?';
+        } else if (penguji_type === 'ketua_penguji') {
+            pengujiSQL = 'ketua_penguji = ? ';
+        } else {
+            throw new Error('invalid penguji type');
+        }
+
+        for (const id of ids) {
+            const [updPenguji] = await db.execute(
+                `UPDATE form_ta SET ${pengujiSQL} WHERE id = ?`,
+                [penguji_id, id]
+            );
+
+            if (updPenguji.affectedRows === 0) {
+                throw new Error(ERR_MSG.ID_NOTFOUND_UPD);
+            }
+        }
+
+        return httpResponse(res, httpStatus.OK, 'penguji has been assigned');
+    } catch (error) {
+        return serverErrorResponse(res, error);
+    }
+};
+
 module.exports = {
     getStudentSubmittedForms,
     assignKoordSidang,
+    assignRoom,
+    assignPenguji,
 };

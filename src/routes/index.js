@@ -9,6 +9,7 @@ const Form = require('./formRoutes');
 const AcademicYear = require('./academicYearRoutes');
 const Assign = require('./assignRoutes');
 const Lecturer = require('./lecturerRoutes');
+const CanteenScan = require('./canteenScaneRoutes');
 
 /* Use routes */
 router.use('/user', User);
@@ -19,5 +20,6 @@ router.use('/form', Form);
 router.use('/academic-year', AcademicYear);
 router.use('/assign', Assign);
 router.use('/lecturer', Lecturer);
+router.use('/canteen-scan', CanteenScan);
 
 module.exports = router;
