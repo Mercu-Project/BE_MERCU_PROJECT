@@ -123,6 +123,7 @@ const getLastScanningQr = async (req, res) => {
                     users u
                 JOIN lecturers l ON u.id = l.user_id
                 JOIN canteen_scans cs ON cs.user_id = u.id
+                WHERE DATE(cs.created_at) = CURDATE()
                 ORDER BY
                     cs.created_at
                 DESC LIMIT 5
@@ -135,7 +136,42 @@ const getLastScanningQr = async (req, res) => {
     }
 };
 
+//! For Development Only
+const resetLastScanningQR = async (req, res) => {
+    try {
+        const [resetLastScanning] = await db.execute(
+            `
+                DELETE cs
+                FROM canteen_scans cs
+                JOIN (
+                    SELECT cs.id
+                    FROM users u
+                    JOIN lecturers l ON u.id = l.user_id
+                    JOIN canteen_scans cs ON cs.user_id = u.id
+                    WHERE DATE(cs.created_at) = CURDATE()
+                    ORDER BY cs.created_at DESC
+                    LIMIT 5
+                ) AS subquery
+                ON cs.id = subquery.id
+            `
+        );
+
+        if (resetLastScanning.affectedRows === 0) {
+            throw new Error('Reset failed');
+        }
+
+        return httpResponse(
+            res,
+            httpStatus.OK,
+            'Last scanning has been reset.'
+        );
+    } catch (error) {
+        return serverErrorResponse(res, error);
+    }
+};
+
 module.exports = {
     inputScan,
     getLastScanningQr,
+    resetLastScanningQR,
 };
