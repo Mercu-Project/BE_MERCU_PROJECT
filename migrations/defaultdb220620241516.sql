@@ -9,13 +9,25 @@
 
 CREATE TABLE "canteen_scans" (
   "id" int NOT NULL AUTO_INCREMENT,
-  "user_id" int NOT NULL,
+  "account_id" int NOT NULL,
   "scanned_at" time DEFAULT NULL,
   "created_at" timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   "updated_at" timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY ("id"),
-  KEY "user_id" ("user_id"),
-  CONSTRAINT "canteen_scans_ibfk_1" FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE
+  KEY "account_id" ("account_id"),
+  CONSTRAINT "canteen_scans_ibfk_1" FOREIGN KEY ("account_id") REFERENCES "accounts" ("id") ON DELETE CASCADE
+);
+
+CREATE TABLE "users" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "full_name" varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "status" enum('0','1') COLLATE utf8mb4_unicode_ci DEFAULT '1',
+  "account_id" int NOT NULL,
+  "created_at" timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY ("id"),
+  KEY "account_id" ("account_id"),
+  CONSTRAINT "users_ibfk_1" FOREIGN KEY ("account_id") REFERENCES "accounts" ("id") ON DELETE CASCADE
 );
 
 

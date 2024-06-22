@@ -3,6 +3,7 @@ const { httpResponse, serverErrorResponse } = require('../utils/httpResponse');
 const { validationResult } = require('express-validator');
 const httpStatus = require('http-status');
 const moment = require('moment-timezone');
+const ExcelJS = require('exceljs');
 
 const inputScan = async (req, res) => {
     try {
@@ -48,25 +49,36 @@ const inputScan = async (req, res) => {
         const [userRows] = await db.execute(
             `
                 SELECT
-                    u.id,
-                    u.username,
-                    l.full_name,
-                    l.jabatan_akademik
+                    acc.id,
+                    acc.username,
+                    u.full_name,
+                    u.status
                 FROM
-                    users u
-                JOIN
-                    lecturers l ON u.id = l.user_id
+                    accounts acc
+                JOIN users u ON u.account_id = acc.id
                 WHERE
-                    u.username = ?
+                    acc.username = ?
             `,
             [nim]
         );
+
+        if (userRows.length === 0) {
+            return httpResponse(
+                res,
+                httpStatus.NOT_FOUND,
+                'User tidak ditemukan'
+            );
+        }
+
+        if (userRows[0].status !== '1') {
+            return httpResponse(res, httpStatus.FORBIDDEN, 'User tidak aktif');
+        }
 
         const [checkScannedRows] = await db.execute(
             `
                 SELECT COUNT(*) AS scan_count
                 FROM canteen_scans
-                WHERE user_id = ? AND DATE(created_at) = CURRENT_DATE
+                WHERE account_id = ? AND DATE(created_at) = CURRENT_DATE
             `,
             [userRows[0].id]
         );
@@ -75,15 +87,7 @@ const inputScan = async (req, res) => {
             return httpResponse(
                 res,
                 httpStatus.BAD_REQUEST,
-                'this account has been scanned'
-            );
-        }
-
-        if (userRows.length === 0) {
-            return httpResponse(
-                res,
-                httpStatus.BAD_REQUEST,
-                'nim tidak ditemukan'
+                'User ini sudah scan'
             );
         }
 
@@ -94,7 +98,7 @@ const inputScan = async (req, res) => {
         await db.execute(
             `
                 INSERT INTO canteen_scans
-                (user_id, scanned_at)
+                (account_id, scanned_at)
                 VALUES
                 (?, ?)
             `,
@@ -104,7 +108,6 @@ const inputScan = async (req, res) => {
         const response = {
             nim: hiddenNumber,
             fullName: userRows[0].full_name,
-            jabatan: userRows[0].jabatan_akademik,
         };
 
         return httpResponse(res, httpStatus.OK, 'scan success', response);
@@ -118,12 +121,12 @@ const getLastScanningQr = async (req, res) => {
         const [rows] = await db.execute(
             `
                 SELECT
-                    u.username AS nim,
-                    l.full_name AS fullName
+                    acc.username AS nim,
+                    u.full_name AS fullName
                 FROM 
-                    users u
-                JOIN lecturers l ON u.id = l.user_id
-                JOIN canteen_scans cs ON cs.user_id = u.id
+                    accounts acc
+                JOIN users u ON acc.id = u.account_id
+                JOIN canteen_scans cs ON cs.account_id = acc.id
                 WHERE DATE(cs.created_at) = CURDATE()
                 ORDER BY
                     cs.created_at
@@ -146,9 +149,9 @@ const resetLastScanningQR = async (req, res) => {
                 FROM canteen_scans cs
                 JOIN (
                     SELECT cs.id
-                    FROM users u
-                    JOIN lecturers l ON u.id = l.user_id
-                    JOIN canteen_scans cs ON cs.user_id = u.id
+                    FROM accounts acc
+                    JOIN users u ON acc.id = u.account_id
+                    JOIN canteen_scans cs ON cs.account_id = acc.id
                     WHERE DATE(cs.created_at) = CURDATE()
                     ORDER BY cs.created_at DESC
                     LIMIT 5
@@ -306,9 +309,86 @@ const getStatistics = async (req, res) => {
     }
 };
 
+const exportCanteenScan = async (req, res) => {
+    try {
+        const { from, to } = req.query;
+
+        const [rows] = await db.execute(
+            `
+                SELECT u.full_name AS Nama, COUNT(cs.id) AS JumlahScan
+                FROM users u
+                LEFT JOIN canteen_scans cs ON u.account_id = cs.account_id
+                WHERE CONVERT_TZ(cs.created_at, '+00:00', '+07:00') BETWEEN ? AND ?
+                GROUP BY u.id
+            `,
+            [from, to]
+        );
+
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Canteen Scan');
+
+        worksheet.columns = [
+            { header: 'No', key: 'No', width: 10 },
+            { header: 'Nama', key: 'Nama', width: 30 },
+            { header: 'Jumlah Scan', key: 'JumlahScan', width: 15 },
+        ];
+
+        worksheet.getRow(1).eachCell((cell) => {
+            cell.font = { bold: true };
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            cell.border = {
+                top: { style: 'thin' },
+                left: { style: 'thin' },
+                bottom: { style: 'thin' },
+                right: { style: 'thin' },
+            };
+        });
+
+        rows.forEach((row, index) => {
+            const newRow = worksheet.addRow({ No: index + 1, ...row });
+            newRow.eachCell((cell) => {
+                cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                cell.border = {
+                    top: { style: 'thin' },
+                    left: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    right: { style: 'thin' },
+                };
+            });
+        });
+
+        const column = worksheet.getColumn('Nama');
+        let maxLength = 30; // default width
+        rows.forEach((row) => {
+            if (row.Nama.length > maxLength) {
+                maxLength = row.Nama.length + 5;
+            }
+        });
+        column.width = maxLength;
+
+        const filename =
+            'canteen_scans_' +
+            moment().tz('Asia/Jakarta').format('YYYYMMDDHHmmss');
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        res.setHeader(
+            'Content-Disposition',
+            `attachment; filename="${filename}.xlsx"`
+        );
+        res.setHeader(
+            'Content-Type',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        );
+        res.send(buffer);
+    } catch (error) {
+        return serverErrorResponse(res, error);
+    }
+};
+
 module.exports = {
     inputScan,
     getLastScanningQr,
     resetLastScanningQR,
     getStatistics,
+    exportCanteenScan,
 };

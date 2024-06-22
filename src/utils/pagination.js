@@ -13,4 +13,15 @@ const buildPaginationData = (limit, page, totalData) => {
     };
 };
 
-module.exports = buildPaginationData;
+const parseOrUseDefault = (limit, page) => {
+    const perPage = parseInt(limit) || 10;
+    const currentPage = parseInt(page) || 1;
+
+    return { perPage, currentPage };
+};
+
+const getOffset = (limit, page) => {
+    return (page - 1) * limit;
+};
+
+module.exports = { buildPaginationData, parseOrUseDefault, getOffset };

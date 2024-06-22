@@ -6,6 +6,7 @@ const { validationResult } = require('express-validator');
 const httpStatus = require('http-status');
 const roleTableConstants = require('../utils/roleTableConstants');
 
+// ! Development Only
 const register = async (req, res) => {
     try {
         const { username, password, roleId } = req.body;
@@ -52,6 +53,62 @@ const register = async (req, res) => {
     }
 };
 
+//! Developemnt Only
+const registerAdmin = async (req, res) => {
+    let connection;
+    try {
+        const { username, password, full_name } = req.body;
+
+        const hashed = bcrypt.hashPassword(password);
+
+        const [oldUsername] = await db.execute(
+            'SELECT username FROM accounts WHERE username = ?',
+            [username]
+        );
+
+        if (oldUsername.length > 0) {
+            return httpResponse(
+                res,
+                httpStatus.CONFLICT,
+                'Username already exist'
+            );
+        }
+
+        connection = await db.getConnection();
+
+        await connection.beginTransaction();
+
+        const [newAccount] = await db.execute(
+            'INSERT INTO accounts (username, password, role_id) VALUES (?, ?, 1) ',
+            [username, hashed]
+        );
+
+        const accountId = newAccount.insertId;
+
+        const [newAdmin] = await db.execute(
+            'INSERT INTO admins (full_name, account_id) VALUES (?, ?)',
+            [full_name, accountId]
+        );
+
+        if (newAdmin.affectedRows === 0) {
+            throw new Error('Failed creating admin');
+        }
+
+        await connection.commit();
+
+        connection.release();
+
+        return httpResponse(res, httpStatus.CREATED, 'Admin has been created');
+    } catch (error) {
+        if (connection) {
+            await connection.rollback();
+            connection.release();
+        }
+
+        return serverErrorResponse(res, error);
+    }
+};
+
 const login = async (req, res) => {
     try {
         const { username, password } = req.body;
@@ -62,31 +119,34 @@ const login = async (req, res) => {
         }
 
         const [rows] = await db.execute(
-            `SELECT u.id, u.username, u.password, r.name AS roleName 
-            FROM users u LEFT JOIN roles r ON u.role_id = r.id WHERE u.username = ?`,
+            'SELECT id, username, password, role_id FROM accounts WHERE username = ?',
             [username]
         );
 
-        if (rows.length < 1) {
-            return httpResponse(res, 404, 'user not found');
+        if (rows.length === 0) {
+            return httpResponse(res, httpStatus.BAD_REQUEST, 'Username salah');
         }
 
         if (!bcrypt.comparePassword(password, rows[0].password)) {
-            return httpResponse(res, 400, 'Password is incorrect');
+            return httpResponse(res, httpStatus.BAD_REQUEST, 'Password Salah');
         }
 
-        const tbl = roleTableConstants[rows[0].roleName];
+        const [roleRows] = await db.execute(
+            'SELECT id, name FROM roles WHERE id = ?',
+            [rows[0].role_id]
+        );
 
-        const [nameRows] = await db.execute(
-            `SELECT full_name AS name FROM ${tbl} WHERE user_id = ?`,
+        const tbl = roleTableConstants[roleRows[0].name];
+
+        const [detailAccountRows] = await db.execute(
+            `SELECT full_name FROM ${tbl} WHERE account_id = ? `,
             [rows[0].id]
         );
 
         const payload = {
-            id: rows[0].id,
+            name: detailAccountRows[0].full_name,
             username: rows[0].username,
-            role: rows[0].roleName,
-            name: nameRows[0].name,
+            role: roleRows[0].name,
         };
 
         const token = jwt.generateToken(payload);
@@ -100,4 +160,5 @@ const login = async (req, res) => {
 module.exports = {
     register,
     login,
+    registerAdmin,
 };

@@ -4,6 +4,7 @@ const User = require('../controllers/userController');
 const auth = require('../middlewares/auth');
 const checkRole = require('../middlewares/checkRole');
 
-router.get('/get-student', auth, checkRole('Mahasiswa'), User.getStudent);
+router.post('/register-user', auth, checkRole('Admin'), User.registerUser);
+router.get('/get-users', auth, checkRole('Admin'), User.getUsers);
 
 module.exports = router;

@@ -1,0 +1,79 @@
+const express = require('express');
+const mysql = require('mysql2');
+const ExcelJS = require('exceljs');
+const moment = require('moment-timezone');
+
+const app = express();
+const port = 3000;
+
+// MySQL connection setup
+const db = mysql.createConnection({
+    host: 'localhost',
+    user: 'your-username',
+    password: 'your-password',
+    database: 'your-database'
+});
+
+db.connect(err => {
+    if (err) {
+        console.error('Database connection failed:', err.stack);
+        return;
+    }
+    console.log('Connected to database.');
+});
+
+// Route to export data to Excel
+app.get('/export', async (req, res) => {
+    try {
+        // Query the database
+        const query = `
+            SELECT 
+                lecturers.full_name AS lecturer_name, 
+                lecturers.jabatan_akademik, 
+                canteen_scans.scanned_at, 
+                canteen_scans.created_at 
+            FROM canteen_scans 
+            JOIN users ON canteen_scans.user_id = users.id 
+            JOIN lecturers ON users.id = lecturers.user_id;
+        `;
+
+        db.query(query, async (err, results) => {
+            if (err) throw err;
+
+            // Create a new workbook and worksheet
+            const workbook = new ExcelJS.Workbook();
+            const worksheet = workbook.addWorksheet('Canteen Scans');
+
+            // Add column headers
+            worksheet.columns = [
+                { header: 'Lecturer Name', key: 'lecturer_name', width: 30 },
+                { header: 'Jabatan Akademik', key: 'jabatan_akademik', width: 30 },
+                { header: 'Scan Date', key: 'scanned_at', width: 20 }
+            ];
+
+            // Add rows
+            results.forEach(row => {
+                worksheet.addRow({
+                    lecturer_name: row.lecturer_name,
+                    jabatan_akademik: row.jabatan_akademik,
+                    scanned_at: moment(row.scanned_at).tz('Asia/Jakarta').format('YYYY-MM-DD HH:mm:ss')
+                });
+            });
+
+            // Write to a buffer
+            const buffer = await workbook.xlsx.writeBuffer();
+
+            // Send the buffer as an attachment
+            res.setHeader('Content-Disposition', 'attachment; filename="canteen_scans.xlsx"');
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.send(buffer);
+        });
+    } catch (err) {
+        console.error('Error exporting data to Excel:', err);
+        res.status(500).send('Internal Server Error');
+    }
+});
+
+app.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+});
