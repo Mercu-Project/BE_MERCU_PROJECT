@@ -1,7 +1,7 @@
 const db = require('../config/db');
 const { httpResponse, serverErrorResponse } = require('../utils/httpResponse');
 const { validationResult } = require('express-validator');
-const buildPaginationData = require('../utils/pagination');
+const { buildPaginationData } = require('../utils/pagination');
 const httpStatus = require('http-status');
 const checkValidation = require('../utils/checkValidationResult');
 const { ERR_MSG } = require('../utils/constants');
