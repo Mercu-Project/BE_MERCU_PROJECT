@@ -173,7 +173,7 @@ const changeUserStatus = async (req, res) => {
 const editUser = async (req, res) => {
     let connection;
     try {
-        const { username } = req.user;
+        const { username } = req.params;
         const { newStatus, newUsername, newFullName } = req.body;
 
         const [accountRow] = await db.execute(
