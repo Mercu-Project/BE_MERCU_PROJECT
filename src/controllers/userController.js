@@ -7,6 +7,7 @@ const {
     getOffset,
     buildPaginationData,
 } = require('../utils/pagination');
+const { ERR_MSG } = require('../utils/constants');
 
 const getUsers = async (req, res) => {
     try {
@@ -77,29 +78,6 @@ const getUsers = async (req, res) => {
     }
 };
 
-const getStudent = async (req, res) => {
-    try {
-        const { username } = req.user;
-        const [userRows] = await db.execute(
-            `
-            SELECT u.username, s.full_name, s.email, s.phone, s.nik 
-            FROM students s LEFT JOIN users u ON s.user_id = u.id
-            WHERE u.username = ? 
-        `,
-            [username]
-        );
-
-        return httpResponse(
-            res,
-            httpStatus.OK,
-            'Get student success',
-            userRows[0]
-        );
-    } catch (error) {
-        return serverErrorResponse(res, error);
-    }
-};
-
 const registerUser = async (req, res) => {
     let connection;
     try {
@@ -163,8 +141,37 @@ const registerUser = async (req, res) => {
     }
 };
 
+const changeUserStatus = async (req, res) => {
+    try {
+        const { username } = req.params;
+        const { status } = req.body;
+
+        const [accountRow] = await db.execute(
+            'SELECT id FROM accounts WHERE username = ?',
+            [username]
+        );
+
+        if (accountRow.length === 0) {
+            return httpResponse(res, httpStatus.NOT_FOUND, 'Account not found');
+        }
+
+        const [updateRow] = await db.execute(
+            `UPDATE users SET status = ? WHERE account_id = ?`,
+            [status, accountRow[0].id]
+        );
+
+        if (updateRow.affectedRows === 0) {
+            throw new Error(ERR_MSG.FAIL_UPD);
+        }
+
+        return httpResponse(res, httpStatus.OK, 'Status changed');
+    } catch (error) {
+        return serverErrorResponse(res, error);
+    }
+};
+
 module.exports = {
     getUsers,
-    getStudent,
     registerUser,
+    changeUserStatus,
 };
