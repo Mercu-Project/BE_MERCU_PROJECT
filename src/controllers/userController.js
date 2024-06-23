@@ -170,8 +170,70 @@ const changeUserStatus = async (req, res) => {
     }
 };
 
+const editUser = async (req, res) => {
+    let connection;
+    try {
+        const { username } = req.user;
+        const { newStatus, newUsername, newFullName } = req.body;
+
+        const [accountRow] = await db.execute(
+            'SELECT id FROM accounts WHERE username = ?',
+            [username]
+        );
+
+        if (accountRow.length === 0) {
+            return httpResponse(res, httpStatus.NOT_FOUND, 'Account not found');
+        }
+
+        connection = await db.getConnection();
+
+        await connection.beginTransaction();
+
+        const [oldUsername] = await db.execute(
+            'SELECT username FROM accounts WHERE username = ?',
+            [newUsername]
+        );
+
+        if (oldUsername.length > 0) {
+            return httpResponse(res, httpStatus.CONFLICT, 'Username sudah ada');
+        }
+
+        const [updateAcount] = await db.execute(
+            'UPDATE accounts SET username = ? WHERE id = ?',
+            [newUsername, accountRow[0].id]
+        );
+
+        if (updateAcount.affectedRows === 0) {
+            throw new Error(ERR_MSG.FAIL_UPD);
+        }
+
+        const [updateUser] = await db.execute(
+            'UPDATE users SET full_name = ?, status = ? WHERE account_id = ?',
+            [newFullName, newStatus, accountRow[0].id]
+        );
+
+        if (updateUser.affectedRows === 0) {
+            throw new Error(ERR_MSG.FAIL_UPD);
+        }
+
+        await connection.commit();
+
+        connection.release();
+
+        return httpResponse(res, httpStatus.OK, 'User has been updated');
+    } catch (error) {
+        if (connection) {
+            await connection.rollback();
+            connection.release();
+        }
+
+        return serverErrorResponse(res, error);
+    }
+};
+
 module.exports = {
     getUsers,
     registerUser,
     changeUserStatus,
+    editUser,
 };

@@ -12,5 +12,6 @@ router.patch(
     checkRole('Admin'),
     User.changeUserStatus
 );
+router.patch('/edit-user', auth, checkRole('User'), User.editUser);
 
 module.exports = router;

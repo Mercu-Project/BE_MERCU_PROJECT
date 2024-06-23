@@ -158,8 +158,48 @@ const login = async (req, res) => {
     }
 };
 
+const changePassword = async (req, res) => {
+    try {
+        const { username } = req.user;
+        const { oldPassword, newPassword } = req.body;
+
+        const [accountRow] = await db.execute(
+            'SELECT id, username, password FROM accounts WHERE username = ?',
+            [username]
+        );
+
+        if (accountRow.length === 0) {
+            return httpResponse(res, httpStatus.NOT_FOUND, 'user not found');
+        }
+
+        if (!bcrypt.comparePassword(oldPassword, accountRow[0].password)) {
+            return httpResponse(
+                res,
+                httpStatus.BAD_REQUEST,
+                'Password lama salah'
+            );
+        }
+
+        const hashed = bcrypt.hashPassword(newPassword);
+
+        const [updateAccount] = await db.execute(
+            'UPDATE accounts SET password = ? WHERE username = ? AND id = ?',
+            [hashed, username, accountRow[0].id]
+        );
+
+        if (updateAccount.affectedRows === 0) {
+            throw new Error(ERR_MSG.FAIL_UPD);
+        }
+
+        return httpResponse(res, httpStatus.OK, 'Password has been updated');
+    } catch (error) {
+        return serverErrorResponse(res, error);
+    }
+};
+
 module.exports = {
     register,
     login,
     registerAdmin,
+    changePassword,
 };
