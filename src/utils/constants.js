@@ -12,6 +12,7 @@ module.exports = {
         Mahasiswa: 'students',
         Dosen: 'lecturers',
         Admin: 'admins',
+        User: 'users',
     },
 
     /* Pagination */

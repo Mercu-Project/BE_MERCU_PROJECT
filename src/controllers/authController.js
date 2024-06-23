@@ -5,6 +5,7 @@ const db = require('../config/db');
 const { validationResult } = require('express-validator');
 const httpStatus = require('http-status');
 const roleTableConstants = require('../utils/roleTableConstants');
+const { RO_TBL } = require('../utils/constants');
 
 // ! Development Only
 const register = async (req, res) => {
@@ -136,7 +137,7 @@ const login = async (req, res) => {
             [rows[0].role_id]
         );
 
-        const tbl = roleTableConstants[roleRows[0].name];
+        const tbl = RO_TBL[roleRows[0].name];
 
         const [detailAccountRows] = await db.execute(
             `SELECT full_name FROM ${tbl} WHERE account_id = ? `,
