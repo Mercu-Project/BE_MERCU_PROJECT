@@ -189,13 +189,19 @@ const editUser = async (req, res) => {
 
         await connection.beginTransaction();
 
-        const [oldUsername] = await db.execute(
-            'SELECT username FROM accounts WHERE username = ?',
-            [newUsername]
-        );
+        if (username !== newUsername) {
+            const [oldUsername] = await db.execute(
+                'SELECT username FROM accounts WHERE username = ?',
+                [newUsername]
+            );
 
-        if (oldUsername.length > 0) {
-            return httpResponse(res, httpStatus.CONFLICT, 'Username sudah ada');
+            if (oldUsername.length > 0) {
+                return httpResponse(
+                    res,
+                    httpStatus.CONFLICT,
+                    'Username sudah ada'
+                );
+            }
         }
 
         const [updateAcount] = await db.execute(
