@@ -20,4 +20,26 @@ module.exports = {
         DFLT_LIMIT: 10,
         DFLT_PAGE: 1,
     },
+
+    /* Status Canteen Preorder */
+    PO_STAT: {
+        PENDING: 'Menunggu Persetujuan',
+        REJECT: {
+            PAYLOAD: 'Ditolak',
+            SYSTEM: 'Ditolak oleh {0}',
+        },
+        APPROVE: {
+            PAYLOAD: 'Disetujui',
+            SYSTEM: 'Disetujui oleh {0}',
+        },
+    },
+
+    /* Role Constants */
+    ROLES: {
+        TU: 'TU',
+        ADMIN: 'Admin',
+        USER: 'User',
+        DEKAN: 'Dekan',
+        BAK: 'BAK',
+    },
 };

@@ -10,7 +10,7 @@ const { RO_TBL } = require('../utils/constants');
 // ! Development Only
 const register = async (req, res) => {
     try {
-        const { username, password, roleId } = req.body;
+        const { username, password, roleId, facultyId } = req.body;
 
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
@@ -18,7 +18,7 @@ const register = async (req, res) => {
         }
 
         const [rows] = await db.execute(
-            'SELECT username FROM users WHERE username = ?',
+            'SELECT username FROM account WHERE username = ?',
             [username]
         );
 
@@ -58,7 +58,7 @@ const register = async (req, res) => {
 const registerAdmin = async (req, res) => {
     let connection;
     try {
-        const { username, password, full_name } = req.body;
+        const { username, password, full_name, roleId, facultyId } = req.body;
 
         const hashed = bcrypt.hashPassword(password);
 
@@ -75,13 +75,31 @@ const registerAdmin = async (req, res) => {
             );
         }
 
+        const [checkRole] = await db.execute(
+            'SELECT id FROM roles WHERE id = ?',
+            [roleId]
+        );
+
+        if (checkRole.length < 1) {
+            return httpResponse(res, httpStatus.NOT_FOUND, 'Role not found');
+        }
+
+        const [checkFaculty] = await db.execute(
+            'SELECT id FROM faculties WHERE id = ?',
+            [facultyId]
+        );
+
+        if (checkFaculty.length < 1) {
+            return httpResponse(res, httpStatus.NOT_FOUND, 'Faculty not found');
+        }
+
         connection = await db.getConnection();
 
         await connection.beginTransaction();
 
         const [newAccount] = await db.execute(
-            'INSERT INTO accounts (username, password, role_id) VALUES (?, ?, 1) ',
-            [username, hashed]
+            'INSERT INTO accounts (username, password, role_id, faculty_id) VALUES (?, ?, ?, ?) ',
+            [username, hashed, roleId, facultyId]
         );
 
         const accountId = newAccount.insertId;
@@ -120,7 +138,7 @@ const login = async (req, res) => {
         }
 
         const [rows] = await db.execute(
-            'SELECT id, username, password, role_id FROM accounts WHERE username = ?',
+            'SELECT id, username, password, role_id, faculty_id FROM accounts WHERE username = ?',
             [username]
         );
 
@@ -137,7 +155,7 @@ const login = async (req, res) => {
             [rows[0].role_id]
         );
 
-        const tbl = RO_TBL[roleRows[0].name];
+        const tbl = roleRows[0].name === 'User' ? 'users' : 'admins';
 
         const [detailAccountRows] = await db.execute(
             `SELECT full_name FROM ${tbl} WHERE account_id = ? `,
@@ -145,9 +163,11 @@ const login = async (req, res) => {
         );
 
         const payload = {
+            id: rows[0].id,
             name: detailAccountRows[0].full_name,
             username: rows[0].username,
             role: roleRows[0].name,
+            facultyId: rows[0].faculty_id,
         };
 
         const token = jwt.generateToken(payload);

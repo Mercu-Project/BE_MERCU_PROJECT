@@ -10,6 +10,7 @@ const AcademicYear = require('./academicYearRoutes');
 const Assign = require('./assignRoutes');
 const Lecturer = require('./lecturerRoutes');
 const CanteenScan = require('./canteenScaneRoutes');
+const CanteenPreorder = require('./canteenPreorderRoutes');
 
 /* Use routes */
 router.use('/user', User);
@@ -21,5 +22,6 @@ router.use('/academic-year', AcademicYear);
 router.use('/assign', Assign);
 router.use('/lecturer', Lecturer);
 router.use('/canteen-scan', CanteenScan);
+router.use('/canteen-preorder', CanteenPreorder);
 
 module.exports = router;
