@@ -204,40 +204,28 @@ const getPreorders = async (req, res) => {
 
         const offset = (page - 1) * limit;
 
+        console.log(req.user.facultyId);
+
         const [rows] = await db.execute(
             `SELECT 
                 cpo.event_date,
                 cpo.request_count,
-                SUM(cpd.qty) AS total_qty,
-                latest_status.status,
-                cpo.number
+                cpo.status,
+                cpo.number,
+                SUM(cpod.qty) AS total_quantity
             FROM 
                 canteen_preorders cpo
-            JOIN 
-                canteen_preorder_detail cpd ON cpd.preorder_id = cpo.id
-            JOIN 
-                (
-                    SELECT 
-                        preorder_id, 
-                        status
-                    FROM 
-                        canteen_preorder_status_history
-                    WHERE 
-                        id IN (
-                            SELECT 
-                                MAX(id)
-                            FROM 
-                                canteen_preorder_status_history
-                            GROUP BY 
-                                preorder_id
-                        )
-                ) latest_status ON latest_status.preorder_id = cpo.id
+            LEFT JOIN 
+                canteen_preorder_detail cpod ON cpo.id = cpod.preorder_id
+            WHERE
+                cpo.faculty_id = ?
             GROUP BY 
-                cpo.id, latest_status.status
-            ORDER BY 
+                cpo.id
+            ORDER BY
                 cpo.created_at DESC
-            LIMIT 
-                ${limit} OFFSET ${offset}
+            LIMIT ${limit}
+            OFFSET ${offset}
+
  `,
             [req.user.facultyId]
         );
