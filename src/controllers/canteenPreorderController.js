@@ -381,7 +381,7 @@ const editPreorder = async (req, res) => {
         }
 
         const [updatePreorder] = await connection.execute(
-            `UPDATE canteen_preorders SET event_date = ?, status = ? WHERE id = ?`,
+            `UPDATE canteen_preorders SET event_date = ?, status = ?, request_count = request_count + 1 WHERE id = ?`,
             [eventDate, PO_STAT.PENDING, id]
         );
 
