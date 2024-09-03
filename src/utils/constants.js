@@ -23,15 +23,13 @@ module.exports = {
 
     /* Status Canteen Preorder */
     PO_STAT: {
-        PENDING: 'Menunggu Persetujuan',
-        REJECT: {
-            PAYLOAD: 'Ditolak',
-            SYSTEM: 'Ditolak oleh {0}',
-        },
-        APPROVE: {
-            PAYLOAD: 'Disetujui',
-            SYSTEM: 'Disetujui oleh {0}',
-        },
+        PENDING_PAYLOAD: 'Menunggu Persetujuan',
+        PENDING: 'Menunggu Persetujuan {0}',
+        REJECT_PAYLOAD: 'Ditolak',
+        REJECT: 'Ditolak oleh {0}',
+        APPROVE_PAYLOAD: 'Disetujui',
+        APPROVE: 'Disetujui oleh {0}',
+        CANTEEN_PROCESS: 'Menunggu Proses Kantin',
     },
 
     /* Role Constants */
@@ -41,5 +39,17 @@ module.exports = {
         USER: 'User',
         DEKAN: 'Dekan',
         BAK: 'BAK',
+    },
+
+    /* Date Format Type */
+    DATE_FMT_TYPE: {
+        DATE: 'date',
+        DATETIME: 'datetime',
+        TIMESTAMP: 'timestamp',
+    },
+
+    /* Date Timezone */
+    DATE_TZ: {
+        JAKARTA: 'Asia/Jakarta',
     },
 };

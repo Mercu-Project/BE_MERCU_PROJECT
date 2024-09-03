@@ -138,7 +138,8 @@ const login = async (req, res) => {
         }
 
         const [rows] = await db.execute(
-            'SELECT id, username, password, role_id, faculty_id FROM accounts WHERE username = ?',
+            `SELECT u.id, u.username, u.password, u.role_id, u.faculty_id, f.name AS faculty_name 
+            FROM accounts u JOIN faculties f ON f.id = u.faculty_id WHERE username = ?`,
             [username]
         );
 
@@ -168,6 +169,7 @@ const login = async (req, res) => {
             username: rows[0].username,
             role: roleRows[0].name,
             facultyId: rows[0].faculty_id,
+            facultyName: rows[0].faculty_name,
         };
 
         const token = jwt.generateToken(payload);

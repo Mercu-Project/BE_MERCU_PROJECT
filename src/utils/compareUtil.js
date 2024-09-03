@@ -26,10 +26,20 @@ function isModified(oldData, newData) {
     return Object.keys(modifiedFields).length > 0 ? modifiedFields : null;
 }
 
+const isBlank = (val) => {
+    return val === '' || val === null || val === undefined;
+};
+
+const isNotBlank = (val) => {
+    return !isBlank(val);
+};
+
 module.exports = {
     isEqual,
     isNotEqual,
     isModified,
     isContains,
     isNotContains,
+    isBlank,
+    isNotBlank,
 };

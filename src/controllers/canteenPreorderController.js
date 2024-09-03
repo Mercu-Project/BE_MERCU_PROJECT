@@ -1,21 +1,22 @@
 const { httpResponse, serverErrorResponse } = require('../utils/httpResponse');
 const db = require('../config/db');
 const { validationResult } = require('express-validator');
-const { PO_STAT } = require('../utils/constants');
+const { PO_STAT, ROLES, DATE_FMT_TYPE } = require('../utils/constants');
 const httpStatus = require('http-status');
 const {
     isEqual,
     isNotEqual,
-    isModified,
     isNotContains,
+    isBlank,
 } = require('../utils/compareUtil');
 const { replacePlaceholrders } = require('../utils/stringUtil');
 const { buildPaginationData } = require('../utils/pagination');
+const { convertToJakartaTime, getCurrentTime } = require('../utils/dateUtil');
 
 const submitPreorder = async (req, res) => {
     let connection;
     try {
-        const { eventDate, preorderTypes } = req.body;
+        let { eventDate, preorderTypes } = req.body;
 
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
@@ -46,13 +47,18 @@ const submitPreorder = async (req, res) => {
             .toString()
             .padStart(2, '0')}.${currentYear}.${newNumber}`;
 
+        const pendingStatus = replacePlaceholrders(PO_STAT.PENDING, [
+            ROLES.DEKAN,
+        ]);
+
+        eventDate = convertToJakartaTime(eventDate, DATE_FMT_TYPE.DATE);
         const [newPreorder] = await connection.execute(
             'INSERT INTO canteen_preorders (requester_id, event_date, request_count, status, number, faculty_id) VALUES (?, ?, ?, ?, ?, ?)',
             [
                 req.user.id,
                 eventDate,
                 1,
-                PO_STAT.PENDING,
+                pendingStatus,
                 nomorPengajuan,
                 req.user.facultyId,
             ]
@@ -102,13 +108,15 @@ const approvalPreorder = async (req, res) => {
         const { id } = req.params;
         const { status, rejectReason } = req.body;
 
+        const changedAt = getCurrentTime();
+
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
             return httpResponse(res, httpStatus.BAD_REQUEST, errors.array());
         }
 
-        if (status === PO_STAT.REJECT.PAYLOAD) {
-            if (rejectReason === null || rejectReason === '') {
+        if (status === PO_STAT.REJECT_PAYLOAD) {
+            if (isBlank(rejectReason)) {
                 return httpResponse(
                     res,
                     httpStatus.BAD_REQUEST,
@@ -144,36 +152,116 @@ const approvalPreorder = async (req, res) => {
             );
         }
 
-        let newStatus = '';
-        if (isEqual(status, PO_STAT.APPROVE.PAYLOAD)) {
-            newStatus = replacePlaceholrders(PO_STAT.APPROVE.SYSTEM, [
-                req.user.role,
-            ]);
-        } else if (isEqual(status, PO_STAT.REJECT.PAYLOAD)) {
-            newStatus = replacePlaceholrders(PO_STAT.REJECT.SYSTEM, [
-                req.user.role,
-            ]);
+        let preorderStatus = '';
+        const { role } = req.user;
+        if (isEqual(status, PO_STAT.APPROVE_PAYLOAD)) {
+            if (isEqual(role, ROLES.DEKAN)) {
+                /* Masukan Disetujui oleh Dekan di status history */
+                const statusHistory = replacePlaceholrders(PO_STAT.APPROVE, [
+                    ROLES.DEKAN,
+                ]);
+                const [insertAppByDekan] = await connection.execute(
+                    `INSERT INTO canteen_preorder_status_history (status, preorder_id, approver_id, changed_at)
+                    VALUES (?, ?, ?, ?)`,
+                    [statusHistory, id, req.user.id, changedAt]
+                );
+
+                if (insertAppByDekan.affectedRows === 0) {
+                    await connection.rollback();
+                    throw new Error(
+                        'failed executing insert history approve by dekan'
+                    );
+                }
+
+                /* Masukan Menunggu Persetujuan BAK di status history */
+                preorderStatus = replacePlaceholrders(PO_STAT.PENDING, [
+                    ROLES.BAK,
+                ]);
+                const [insertPendBAK] = await connection.execute(
+                    `INSERT INTO canteen_preorder_status_history (status, preorder_id, approver_id, changed_at)
+                    VALUES (?, ?, ?, ?)`,
+                    [preorderStatus, id, req.user.id, changedAt]
+                );
+
+                if (insertPendBAK.affectedRows === 0) {
+                    await connection.rollback();
+                    throw new Error(
+                        'failed executing query status history pending BAK'
+                    );
+                }
+            } else if (isEqual(role, ROLES.BAK)) {
+                /* Masukan Disetujui oleh BAK ke status history */
+                const statusHistory = replacePlaceholrders(PO_STAT.APPROVE, [
+                    ROLES.BAK,
+                ]);
+                const [insertApprBAK] = await connection.execute(
+                    `INSERT INTO canteen_preorder_status_history (status, preorder_id, approver_id, changed_at)
+                    VALUES (?, ?, ?, ?)`,
+                    [statusHistory, id, req.user.id, changedAt]
+                );
+
+                if (insertApprBAK.affectedRows === 0) {
+                    await connection.rollback();
+                    throw new Error(
+                        'failed executing approve by BAK to status history'
+                    );
+                }
+
+                /* Masukan Menuggnu Proses Kantin ke status history */
+                preorderStatus = PO_STAT.CANTEEN_PROCESS;
+                const [insertCanteenProc] = await connection.execute(
+                    `INSERT INTO canteen_preorder_status_history (status, preorder_id, approver_id, changed_at)
+                    VALUES (?, ?, ?, ?)`,
+                    [preorderStatus, id, req.user.id, changedAt]
+                );
+
+                if (insertCanteenProc.affectedRows === 0) {
+                    await connection.rollback();
+                    throw new Error(
+                        'failed executing insert status canteen process to status history'
+                    );
+                }
+            } else {
+                await connection.rollback();
+                return httpResponse(res, httpStatus.FORBIDDEN, 'invalid role');
+            }
+        } else if (isEqual(status, PO_STAT.REJECT_PAYLOAD)) {
+            if (isEqual(role, ROLES.DEKAN)) {
+                preorderStatus = replacePlaceholrders(PO_STAT.REJECT, [
+                    ROLES.DEKAN,
+                ]);
+            } else if (isEqual(role, ROLES.BAK)) {
+                preorderStatus = replacePlaceholrders(PO_STAT.REJECT, [
+                    ROLES.BAK,
+                ]);
+            }
+
+            /* Masukan status Ditolak oleh ke status history */
+            const [insertRejBy] = await connection.execute(
+                `INSERT INTO canteen_preorder_status_history (status, preorder_id, approver_id, reject_reason, changed_at)
+                VALUES (?, ?, ?, ?, ?)`,
+                [preorderStatus, id, req.user.id, rejectReason, changedAt]
+            );
+
+            if (insertRejBy.affectedRows === 0) {
+                await connection.rollback();
+                throw new Error(
+                    'failed executing query insert rejected by to status history'
+                );
+            }
+        } else {
+            await connection.rollback();
+            return httpResponse(res, httpStatus.BAD_REQUEST, 'invalid status');
         }
 
         const [updatePreorder] = await connection.execute(
             'UPDATE canteen_preorders SET status = ? WHERE id = ?',
-            [newStatus, id]
+            [preorderStatus, id]
         );
 
         if (updatePreorder.affectedRows === 0) {
             await connection.rollback();
             throw new Error('failed executing update preorder');
-        }
-
-        const [insertStatusHistory] = await connection.execute(
-            `INSERT INTO canteen_preorder_status_history (preorder_id, status, reject_reason, approver_id)
-            VALUES (?, ?, ?, ?)`,
-            [id, newStatus, rejectReason, req.user.id]
-        );
-
-        if (insertStatusHistory.affectedRows === 0) {
-            await connection.rollback();
-            throw new Error('failed executing insert status history');
         }
 
         await connection.commit();
@@ -198,17 +286,28 @@ const approvalPreorder = async (req, res) => {
 const getPreorders = async (req, res) => {
     try {
         let { limit, page, search = '' } = req.query;
+        const { role } = req.user;
 
         limit = parseInt(limit) || 10;
         page = parseInt(page) || 1;
 
         const offset = (page - 1) * limit;
 
-        console.log(req.user.facultyId);
+        let filterStatus = '';
+        if (isEqual(role, ROLES.DEKAN)) {
+            filterStatus = replacePlaceholrders(PO_STAT.PENDING, [ROLES.DEKAN]);
+        } else if (isEqual(role, ROLES.BAK)) {
+            filterStatus = replacePlaceholrders(PO_STAT.PENDING, [ROLES.BAK]);
+        } else if (isEqual(role, ROLES.TU)) {
+            filterStatus = `%%`;
+        } else if (isEqual(role, ROLES.ADMIN)) {
+            filterStatus = PO_STAT.CANTEEN_PROCESS;
+        }
 
         const [rows] = await db.execute(
             `SELECT 
-                cpo.event_date,
+                cpo.id,
+                CONVERT_TZ(cpo.event_date, '+00:00', 'Asia/Jakarta') AS event_date,
                 cpo.request_count,
                 cpo.status,
                 cpo.number,
@@ -219,6 +318,7 @@ const getPreorders = async (req, res) => {
                 canteen_preorder_detail cpod ON cpo.id = cpod.preorder_id
             WHERE
                 cpo.faculty_id = ?
+            AND cpo.status LIKE ?
             GROUP BY 
                 cpo.id
             ORDER BY
@@ -227,7 +327,7 @@ const getPreorders = async (req, res) => {
             OFFSET ${offset}
 
  `,
-            [req.user.facultyId]
+            [req.user.facultyId, filterStatus]
         );
 
         const pagination = buildPaginationData(limit, page, rows.length);
@@ -248,7 +348,10 @@ const editPreorder = async (req, res) => {
     let connection;
     try {
         const { id } = req.params;
-        const { eventDate, preorderTypes } = req.body;
+        let { eventDate, preorderTypes } = req.body;
+
+        const changedAt = getCurrentTime();
+        eventDate = convertToJakartaTime(eventDate);
 
         connection = await db.getConnection();
         await connection.beginTransaction();
@@ -267,7 +370,7 @@ const editPreorder = async (req, res) => {
             );
         }
 
-        if (isNotContains(oldPreorder[0].status, PO_STAT.REJECT.PAYLOAD)) {
+        if (isNotContains(oldPreorder[0].status, PO_STAT.REJECT_PAYLOAD)) {
             await connection.rollback();
             throw new Error('invalid status');
         }
@@ -299,10 +402,14 @@ const editPreorder = async (req, res) => {
             }
         }
 
+        const pendingStatus = replacePlaceholrders(PO_STAT.PENDING, [
+            ROLES.DEKAN,
+        ]);
+
         const [insertHistory] = await connection.execute(
-            `INSERT INTO canteen_preorder_status_history (status, reject_reason, approver_id, preorder_id)
-            VALUES (?, ?, ?, ?)`,
-            [PO_STAT.PENDING, null, req.user.id, id]
+            `INSERT INTO canteen_preorder_status_history (status, reject_reason, approver_id, preorder_id, changed_at)
+            VALUES (?, ?, ?, ?, ?)`,
+            [pendingStatus, null, req.user.id, id, changedAt]
         );
 
         if (insertHistory.affectedRows === 0) {
@@ -315,6 +422,10 @@ const editPreorder = async (req, res) => {
 
         return httpResponse(res, httpStatus.OK, 'Berhasil mengubah pengajuan');
     } catch (error) {
+        if (connection) {
+            await connection.rollback();
+            connection.release();
+        }
         return serverErrorResponse(res, error);
     }
 };
@@ -328,10 +439,8 @@ const getStatusHistory = async (req, res) => {
                 cph.id,
                 cph.preorder_id,
                 cph.status,
-                cph.changed_at,
+                CONVERT_TZ(cph.changed_at, '+00:00', 'Asia/Jakarta') AS changed_at,
                 cph.reject_reason,
-                cph.created_at,
-                cph.updated_at,
                 a.full_name AS approver_name
             FROM 
                 canteen_preorder_status_history cph
@@ -342,7 +451,7 @@ const getStatusHistory = async (req, res) => {
             WHERE 
                 cph.preorder_id = ?
             ORDER BY 
-                cph.changed_at ASC;
+                cph.changed_at DESC;
  `,
             [id]
         );
