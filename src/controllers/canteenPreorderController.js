@@ -28,6 +28,17 @@ const submitPreorder = async (req, res) => {
             return httpResponse(res, 400, 'validation error', errors.array());
         }
 
+        eventDate = convertToJakartaTime(eventDate, DATE_FMT_TYPE.DATE);
+
+        const dayDifference = getDayDifference(eventDate);
+        if (dayDifference < 7) {
+            return httpResponse(
+                res,
+                httpStatus.BAD_REQUEST,
+                'Jarak waktu acara minimal 7 hari'
+            );
+        }
+
         connection = await db.getConnection();
 
         await connection.beginTransaction();
@@ -56,7 +67,6 @@ const submitPreorder = async (req, res) => {
             ROLES.DEKAN,
         ]);
 
-        eventDate = convertToJakartaTime(eventDate, DATE_FMT_TYPE.DATE);
         const [newPreorder] = await connection.execute(
             'INSERT INTO canteen_preorders (requester_id, event_date, request_count, status, number, faculty_id) VALUES (?, ?, ?, ?, ?, ?)',
             [
@@ -116,8 +126,6 @@ const approvalPreorder = async (req, res) => {
         /* payload */
         const { status, rejectReason } = req.body;
 
-        const changedAt = getCurrentTime();
-
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
             return httpResponse(res, httpStatus.BAD_REQUEST, errors.array());
@@ -165,7 +173,7 @@ const approvalPreorder = async (req, res) => {
         }
 
         let preorderStatus = '';
-        const { role } = req.user.role;
+        const { role } = req.user;
 
         /* Pengecekan status */
         if (isEqual(status, PO_STAT.REJECT_PAYLOAD)) {
@@ -194,8 +202,8 @@ const approvalPreorder = async (req, res) => {
         }
 
         const [updatePreorder] = await connection.execute(
-            'UPDATE canteen_preorders SET status = ? WHERE id = ?',
-            [preorderStatus, id]
+            'UPDATE canteen_preorders SET status = ?, reject_reason = ? WHERE id = ?',
+            [preorderStatus, rejectReason, id]
         );
 
         if (updatePreorder.affectedRows === 0) {
@@ -250,6 +258,7 @@ const getPreorders = async (req, res) => {
                 cpo.request_count,
                 cpo.status,
                 cpo.number,
+                cpo.reject_reason,
                 SUM(cpod.qty) AS total_quantity
             FROM 
                 canteen_preorders cpo
@@ -360,7 +369,7 @@ const editPreorder = async (req, res) => {
             ROLES.DEKAN,
         ]);
         const [updatePreorder] = await connection.execute(
-            `UPDATE canteen_preorders SET event_date = ?, status = ?, request_count = request_count + 1 WHERE id = ?`,
+            `UPDATE canteen_preorders SET event_date = ?, status = ?, request_count = request_count + 1, reject_reason = NULL WHERE id = ?`,
             [eventDate, pendingStatus, id]
         );
 
@@ -383,7 +392,7 @@ const editPreorder = async (req, res) => {
         /* Looping data preorder types dan insert baru */
         for (const preorderType of preorderTypes) {
             const [insertNewPreorderType] = await connection.execute(
-                `INSERT INTO (preorder_id, order_type, qty) VALUES (?, ?, ?)`,
+                `INSERT INTO canteen_preorder_detail (preorder_id, order_type, qty) VALUES (?, ?, ?)`,
                 [id, preorderType.orderType, preorderType.qty]
             );
 
