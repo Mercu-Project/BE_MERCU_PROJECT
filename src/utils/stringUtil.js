@@ -1,4 +1,4 @@
-const replacePlaceholrders = (str, replacements) => {
+const replacePlaceholders = (str, replacements) => {
     return str.replace(
         /{(\d+)}/g,
         (match, number) => replacements[number] || match
@@ -6,5 +6,5 @@ const replacePlaceholrders = (str, replacements) => {
 };
 
 module.exports = {
-    replacePlaceholrders,
+    replacePlaceholders,
 };

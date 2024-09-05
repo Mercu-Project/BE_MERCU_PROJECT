@@ -8,10 +8,15 @@ const {
     isNotEqual,
     isNotContains,
     isBlank,
+    isContains,
 } = require('../utils/compareUtil');
-const { replacePlaceholrders } = require('../utils/stringUtil');
+const { replacePlaceholders } = require('../utils/stringUtil');
 const { buildPaginationData } = require('../utils/pagination');
-const { convertToJakartaTime, getCurrentTime } = require('../utils/dateUtil');
+const {
+    convertToJakartaTime,
+    getCurrentTime,
+    getDayDifference,
+} = require('../utils/dateUtil');
 
 const submitPreorder = async (req, res) => {
     let connection;
@@ -47,7 +52,7 @@ const submitPreorder = async (req, res) => {
             .toString()
             .padStart(2, '0')}.${currentYear}.${newNumber}`;
 
-        const pendingStatus = replacePlaceholrders(PO_STAT.PENDING, [
+        const pendingStatus = replacePlaceholders(PO_STAT.PENDING, [
             ROLES.DEKAN,
         ]);
 
@@ -105,7 +110,10 @@ const submitPreorder = async (req, res) => {
 const approvalPreorder = async (req, res) => {
     let connection;
     try {
+        /* id preorder */
         const { id } = req.params;
+
+        /* payload */
         const { status, rejectReason } = req.body;
 
         const changedAt = getCurrentTime();
@@ -115,6 +123,7 @@ const approvalPreorder = async (req, res) => {
             return httpResponse(res, httpStatus.BAD_REQUEST, errors.array());
         }
 
+        /* Jika status "Ditolak", maka pastikan rejectReason (Alasan Penolakan) diisi */
         if (status === PO_STAT.REJECT_PAYLOAD) {
             if (isBlank(rejectReason)) {
                 return httpResponse(
@@ -129,11 +138,13 @@ const approvalPreorder = async (req, res) => {
 
         await connection.beginTransaction();
 
+        /* Query untuk pengecekan preorder lama ada atau tidak di database */
         const [checkPreorder] = await connection.execute(
             'SELECT faculty_id FROM canteen_preorders WHERE id = ?',
             [id]
         );
 
+        /* Pastikan data preorder lama ada di database, jika tidak maka status not found */
         if (checkPreorder.length < 1) {
             await connection.rollback();
             return httpResponse(
@@ -143,6 +154,7 @@ const approvalPreorder = async (req, res) => {
             );
         }
 
+        /* Pastikan data yang akan dilakukan approval merupakan data fakultas yang sama dengan approver (user yang melakaukan approval) */
         if (isNotEqual(checkPreorder[0].faculty_id, req.user.facultyId)) {
             await connection.rollback();
             return httpResponse(
@@ -153,104 +165,31 @@ const approvalPreorder = async (req, res) => {
         }
 
         let preorderStatus = '';
-        const { role } = req.user;
-        if (isEqual(status, PO_STAT.APPROVE_PAYLOAD)) {
+        const { role } = req.user.role;
+
+        /* Pengecekan status */
+        if (isEqual(status, PO_STAT.REJECT_PAYLOAD)) {
+            /* Jika status == 'Ditolak' maka ubah preorderStatus menjadi "Ditolak oleh [Dekan/BAK]" */
+            preorderStatus = replacePlaceholders(PO_STAT.REJECT, [role]);
+        } else if (isEqual(status, PO_STAT.APPROVE_PAYLOAD)) {
             if (isEqual(role, ROLES.DEKAN)) {
-                /* Masukan Disetujui oleh Dekan di status history */
-                const statusHistory = replacePlaceholrders(PO_STAT.APPROVE, [
-                    ROLES.DEKAN,
-                ]);
-                const [insertAppByDekan] = await connection.execute(
-                    `INSERT INTO canteen_preorder_status_history (status, preorder_id, approver_id, changed_at)
-                    VALUES (?, ?, ?, ?)`,
-                    [statusHistory, id, req.user.id, changedAt]
-                );
-
-                if (insertAppByDekan.affectedRows === 0) {
-                    await connection.rollback();
-                    throw new Error(
-                        'failed executing insert history approve by dekan'
-                    );
-                }
-
-                /* Masukan Menunggu Persetujuan BAK di status history */
-                preorderStatus = replacePlaceholrders(PO_STAT.PENDING, [
+                /* Jika status === 'Disetujui' dan role == 'Dekan' maka status = 'Menunggu Persetujuan BAK' */
+                preorderStatus = replacePlaceholders(PO_STAT.PENDING, [
                     ROLES.BAK,
                 ]);
-                const [insertPendBAK] = await connection.execute(
-                    `INSERT INTO canteen_preorder_status_history (status, preorder_id, approver_id, changed_at)
-                    VALUES (?, ?, ?, ?)`,
-                    [preorderStatus, id, req.user.id, changedAt]
-                );
-
-                if (insertPendBAK.affectedRows === 0) {
-                    await connection.rollback();
-                    throw new Error(
-                        'failed executing query status history pending BAK'
-                    );
-                }
             } else if (isEqual(role, ROLES.BAK)) {
-                /* Masukan Disetujui oleh BAK ke status history */
-                const statusHistory = replacePlaceholrders(PO_STAT.APPROVE, [
-                    ROLES.BAK,
-                ]);
-                const [insertApprBAK] = await connection.execute(
-                    `INSERT INTO canteen_preorder_status_history (status, preorder_id, approver_id, changed_at)
-                    VALUES (?, ?, ?, ?)`,
-                    [statusHistory, id, req.user.id, changedAt]
-                );
-
-                if (insertApprBAK.affectedRows === 0) {
-                    await connection.rollback();
-                    throw new Error(
-                        'failed executing approve by BAK to status history'
-                    );
-                }
-
-                /* Masukan Menuggnu Proses Kantin ke status history */
+                /* Jika status === 'Disetujui' dan role == 'BAK' maka status = 'Menunggu Proses Kantin' */
                 preorderStatus = PO_STAT.CANTEEN_PROCESS;
-                const [insertCanteenProc] = await connection.execute(
-                    `INSERT INTO canteen_preorder_status_history (status, preorder_id, approver_id, changed_at)
-                    VALUES (?, ?, ?, ?)`,
-                    [preorderStatus, id, req.user.id, changedAt]
-                );
-
-                if (insertCanteenProc.affectedRows === 0) {
-                    await connection.rollback();
-                    throw new Error(
-                        'failed executing insert status canteen process to status history'
-                    );
-                }
             } else {
-                await connection.rollback();
-                return httpResponse(res, httpStatus.FORBIDDEN, 'invalid role');
-            }
-        } else if (isEqual(status, PO_STAT.REJECT_PAYLOAD)) {
-            if (isEqual(role, ROLES.DEKAN)) {
-                preorderStatus = replacePlaceholrders(PO_STAT.REJECT, [
-                    ROLES.DEKAN,
-                ]);
-            } else if (isEqual(role, ROLES.BAK)) {
-                preorderStatus = replacePlaceholrders(PO_STAT.REJECT, [
-                    ROLES.BAK,
-                ]);
-            }
-
-            /* Masukan status Ditolak oleh ke status history */
-            const [insertRejBy] = await connection.execute(
-                `INSERT INTO canteen_preorder_status_history (status, preorder_id, approver_id, reject_reason, changed_at)
-                VALUES (?, ?, ?, ?, ?)`,
-                [preorderStatus, id, req.user.id, rejectReason, changedAt]
-            );
-
-            if (insertRejBy.affectedRows === 0) {
-                await connection.rollback();
-                throw new Error(
-                    'failed executing query insert rejected by to status history'
+                /* Jika role bukan Dekan atau BAK, throw error */
+                return httpResponse(
+                    res,
+                    httpStatus.FORBIDDEN,
+                    'cannot do this action'
                 );
             }
         } else {
-            await connection.rollback();
+            /* Jika status bukan Ditolak / Disetujui maka throw error */
             return httpResponse(res, httpStatus.BAD_REQUEST, 'invalid status');
         }
 
@@ -295,9 +234,9 @@ const getPreorders = async (req, res) => {
 
         let filterStatus = '';
         if (isEqual(role, ROLES.DEKAN)) {
-            filterStatus = replacePlaceholrders(PO_STAT.PENDING, [ROLES.DEKAN]);
+            filterStatus = replacePlaceholders(PO_STAT.PENDING, [ROLES.DEKAN]);
         } else if (isEqual(role, ROLES.BAK)) {
-            filterStatus = replacePlaceholrders(PO_STAT.PENDING, [ROLES.BAK]);
+            filterStatus = replacePlaceholders(PO_STAT.PENDING, [ROLES.BAK]);
         } else if (isEqual(role, ROLES.TU)) {
             filterStatus = `%%`;
         } else if (isEqual(role, ROLES.ADMIN)) {
@@ -330,13 +269,46 @@ const getPreorders = async (req, res) => {
             [req.user.facultyId, filterStatus]
         );
 
-        const pagination = buildPaginationData(limit, page, rows.length);
+        /* Looping row result */
+        for (const row of rows) {
+            /* Lakukan pengecekan jika event_date (tanggal acara) dan hari ini berjarak kurang dari 7 hari */
+            /* Dan status nya 'Ditolak' yang artinya PO ini tidak diajukan ulang sehingga melebihi batas minimum tenggat waktu pengajuan */
+            const dayDifference = getDayDifference(row.event_date);
+            if (
+                dayDifference >= 0 &&
+                dayDifference < 7 &&
+                isContains(row.status, PO_STAT.REJECT)
+            ) {
+                /* Maka ubah statusnya menjadi 'Ditolak oleh Sistem' */
+                const [updateStatusRejBySystem] = await db.execute(
+                    `UPDATE canteen_preorders SET status = ? WHERE id = ?`,
+                    [PO_STAT.REJECT_BY_SYSTEM, row.id]
+                );
+
+                if (updateStatusRejBySystem.affectedRows === 0) {
+                    throw new Error(
+                        'failed executing update status to reject by system'
+                    );
+                }
+            }
+        }
+
+        /* Filter row result sehingga yang dikirim ke frontend adalah result yang statusnya bukan 'Ditolak oleh Sistem' */
+        const filteredRows = rows.filter((row) => {
+            return row.status !== PO_STAT.REJECT_BY_SYSTEM;
+        });
+
+        const pagination = buildPaginationData(
+            limit,
+            page,
+            filteredRows.length
+        );
 
         return httpResponse(
             res,
             httpStatus.OK,
             'get preorder data',
-            rows,
+            filteredRows,
             pagination
         );
     } catch (error) {
@@ -350,17 +322,18 @@ const editPreorder = async (req, res) => {
         const { id } = req.params;
         let { eventDate, preorderTypes } = req.body;
 
-        const changedAt = getCurrentTime();
         eventDate = convertToJakartaTime(eventDate);
 
         connection = await db.getConnection();
         await connection.beginTransaction();
 
+        /* Ambil data preorder lama */
         const [oldPreorder] = await connection.execute(
             `SELECT * FROM canteen_preorders WHERE id = ?`,
             [id]
         );
 
+        /* Check apakah data preorder yang lama ada atau tidak */
         if (oldPreorder.length < 1) {
             await connection.rollback();
             return httpResponse(
@@ -370,19 +343,25 @@ const editPreorder = async (req, res) => {
             );
         }
 
+        /* Pastikan data preorder lama status nya "Ditolak". Karena hanya data preorder yang ditolak saja yang bisa diedit (Diajukan ulang) */
         if (isNotContains(oldPreorder[0].status, PO_STAT.REJECT_PAYLOAD)) {
             await connection.rollback();
             throw new Error('invalid status');
         }
 
+        /* Pastikan bahwa data preorder lama, memiliki faculty id yang sama dengan user yag login sekarang */
         if (isNotEqual(oldPreorder[0].faculty_id, req.user.facultyId)) {
             await connection.rollback();
             throw new Error('forbidden');
         }
 
+        /* Update data preorder, ubah status menjadi Menunggu Persetujuan Dekan, dan request_count + 1 */
+        const pendingStatus = replacePlaceholders(PO_STAT.PENDING, [
+            ROLES.DEKAN,
+        ]);
         const [updatePreorder] = await connection.execute(
             `UPDATE canteen_preorders SET event_date = ?, status = ?, request_count = request_count + 1 WHERE id = ?`,
-            [eventDate, PO_STAT.PENDING, id]
+            [eventDate, pendingStatus, id]
         );
 
         if (updatePreorder.affectedRows === 0) {
@@ -390,31 +369,28 @@ const editPreorder = async (req, res) => {
             throw new Error('failed executing update preorder');
         }
 
-        for (const preorderType of preorderTypes) {
-            const [updateType] = await connection.execute(
-                `UPDATE canteen_preorder_detail SET order_type = ?, qty = ? WHERE id = ?`,
-                [preorderType.orderType, preorderType.qty, preorderType.id]
-            );
-
-            if (updateType.affectedRows === 0) {
-                await connection.rollback();
-                throw new Error('failed executing preorder detail');
-            }
-        }
-
-        const pendingStatus = replacePlaceholrders(PO_STAT.PENDING, [
-            ROLES.DEKAN,
-        ]);
-
-        const [insertHistory] = await connection.execute(
-            `INSERT INTO canteen_preorder_status_history (status, reject_reason, approver_id, preorder_id, changed_at)
-            VALUES (?, ?, ?, ?, ?)`,
-            [pendingStatus, null, req.user.id, id, changedAt]
+        /* Hapus semua preorder detail dan timpa dengan data yang baru */
+        const [deletePreorderDetail] = await connection.execute(
+            `DELETE FROM canteen_preorder_detail WHERE preorder_id = ?`,
+            [id]
         );
 
-        if (insertHistory.affectedRows === 0) {
+        if (deletePreorderDetail.affectedRows === 0) {
             await connection.rollback();
-            throw new Error('failed executing insert status history');
+            throw new Error('failed deleting preorder detail');
+        }
+
+        /* Looping data preorder types dan insert baru */
+        for (const preorderType of preorderTypes) {
+            const [insertNewPreorderType] = await connection.execute(
+                `INSERT INTO (preorder_id, order_type, qty) VALUES (?, ?, ?)`,
+                [id, preorderType.orderType, preorderType.qty]
+            );
+
+            if (insertNewPreorderType.affectedRows === 0) {
+                await connection.rollback();
+                throw new Error('failed executing insert new preorder type');
+            }
         }
 
         await connection.commit();

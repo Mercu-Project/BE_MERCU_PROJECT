@@ -27,6 +27,7 @@ module.exports = {
         PENDING: 'Menunggu Persetujuan {0}',
         REJECT_PAYLOAD: 'Ditolak',
         REJECT: 'Ditolak oleh {0}',
+        REJECT_BY_SYSTEM: 'Ditolak oleh Sistem',
         APPROVE_PAYLOAD: 'Disetujui',
         APPROVE: 'Disetujui oleh {0}',
         CANTEEN_PROCESS: 'Menunggu Proses Kantin',

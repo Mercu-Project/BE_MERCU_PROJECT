@@ -32,4 +32,34 @@ function getCurrentTime(type = DATE_FMT_TYPE.DATETIME) {
     }
 }
 
-module.exports = { convertToJakartaTime, getCurrentTime };
+function getDayDifference(inputDate) {
+    const date = moment.tz(inputDate, DATE_TZ.JAKARTA);
+    const today = moment.tz(DATE_TZ.JAKARTA).startOf('day');
+    const dayDifference = date.diff(today, 'days');
+    return dayDifference;
+}
+
+function is7DaysAway(inputDateTime) {
+    // Parse the input datetime string to a Date object
+    const inputDate = new Date(inputDateTime);
+
+    // Get today's date (only the date part, without time)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset the time part of today to midnight
+
+    // Calculate the difference in time (milliseconds) between inputDate and today
+    const timeDifference = inputDate.getTime() - today.getTime();
+
+    // Convert the difference from milliseconds to days
+    const dayDifference = timeDifference / (1000 * 60 * 60 * 24);
+
+    // Check if the difference is exactly 7 days
+    return dayDifference === 7;
+}
+
+module.exports = {
+    convertToJakartaTime,
+    getCurrentTime,
+    is7DaysAway,
+    getDayDifference,
+};
