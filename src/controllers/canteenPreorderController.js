@@ -305,7 +305,7 @@ const getPreorders = async (req, res) => {
         const offset = (page - 1) * limit;
 
         const [checkExpPO] = await db.execute(
-            `SELECT CONVERT_TZ(cpo.event_date, '+00:00', 'Asia/Jakarta') AS eventDate 
+            `SELECT CONVERT_TZ(event_date, '+00:00', 'Asia/Jakarta') AS eventDate 
             FROM canteen_preorders WHERE faculty_id = ?`,
             [req.user.facultyId]
         );
