@@ -312,7 +312,10 @@ const getPreorders = async (req, res) => {
 
         for (const po of checkExpPO) {
             const dayDifference = getDayDifference(po.eventDate);
-            if (dayDifference < 7) {
+            if (
+                dayDifference < 7 &&
+                isContains(po.status, PO_STAT.REJECT_PAYLOAD)
+            ) {
                 const [setRejectBySystem] = await db.execute(
                     `UPDATE canteen_preorders SET status = ? WHERE id = ?`,
                     [PO_STAT.REJECT_BY_SYSTEM, po.id]
