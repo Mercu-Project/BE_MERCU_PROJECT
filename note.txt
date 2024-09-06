@@ -1,0 +1,2 @@
+1. TU memmbuat New Submission, pastikan tanggal yang dimasukkan sesuai dengan WIB (GMT +07:00)
+2. Dekan melakukan approval; Jika ditolak, maka status di table utama menjadi Ditolak oleh Dekan

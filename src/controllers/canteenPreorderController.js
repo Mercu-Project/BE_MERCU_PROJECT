@@ -124,7 +124,7 @@ const approvalPreorder = async (req, res) => {
         const { id } = req.params;
 
         /* payload */
-        const { status, rejectReason } = req.body;
+        let { status, rejectReason } = req.body;
 
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
@@ -173,21 +173,85 @@ const approvalPreorder = async (req, res) => {
         }
 
         let preorderStatus = '';
+        const changedAt = getCurrentTime();
+        const sqlStatusHistory = `INSERT INTO canteen_preorder_status_history 
+                                    (preorder_id, status, changed_at, reject_reason, approver_id)
+                                    VALUES (?, ?, ?, ?, ?)`;
         const { role } = req.user;
 
         /* Pengecekan status */
         if (isEqual(status, PO_STAT.REJECT_PAYLOAD)) {
             /* Jika status == 'Ditolak' maka ubah preorderStatus menjadi "Ditolak oleh [Dekan/BAK]" */
             preorderStatus = replacePlaceholders(PO_STAT.REJECT, [role]);
+
+            /* Audit status 'Ditolak' */
+            const [insertStatusHistory] = await connection.execute(
+                sqlStatusHistory,
+                [id, preorderStatus, changedAt, rejectReason, req.user.id]
+            );
+
+            if (insertStatusHistory.affectedRows === 0) {
+                await connection.rollback();
+                throw new Error('failed executing insert status history');
+            }
         } else if (isEqual(status, PO_STAT.APPROVE_PAYLOAD)) {
+            rejectReason = null;
             if (isEqual(role, ROLES.DEKAN)) {
                 /* Jika status === 'Disetujui' dan role == 'Dekan' maka status = 'Menunggu Persetujuan BAK' */
                 preorderStatus = replacePlaceholders(PO_STAT.PENDING, [
                     ROLES.BAK,
                 ]);
+
+                /* Audit status 'Disetujui oleh Dekan' */
+                const auditStatus = replacePlaceholders(PO_STAT.APPROVE, [
+                    ROLES.DEKAN,
+                ]);
+                const [auditApprByDekan] = await connection.execute(
+                    sqlStatusHistory,
+                    [id, auditStatus, changedAt, null, req.user.id]
+                );
+                if (auditApprByDekan.affectedRows === 0) {
+                    await connection.rollback();
+                    throw new Error('failed executing audit approve by dekan');
+                }
+
+                /* Audit status 'Menunggu Persetujuan BAK' */
+                const [auditPendBAK] = await connection.execute(
+                    sqlStatusHistory,
+                    [id, preorderStatus, changedAt, null, req.user.id]
+                );
+
+                if (auditPendBAK.affectedRows === 0) {
+                    await connection.rollback();
+                    throw new Error('failed executing audit pending BAK');
+                }
             } else if (isEqual(role, ROLES.BAK)) {
                 /* Jika status === 'Disetujui' dan role == 'BAK' maka status = 'Menunggu Proses Kantin' */
                 preorderStatus = PO_STAT.CANTEEN_PROCESS;
+
+                /* Audit status 'Disetujui oleh BAK' */
+                const auditStatus = replacePlaceholders(PO_STAT.APPROVE, [
+                    ROLES.BAK,
+                ]);
+                const [auditApprByBAK] = await connection.execute(
+                    sqlStatusHistory,
+                    [id, auditStatus, changedAt, null, req.user.id]
+                );
+                if (auditApprByBAK.affectedRows === 0) {
+                    await connection.rollback();
+                    throw new Error('failed executing audit approve by BAK');
+                }
+
+                /* Audit status 'Menunggu Prose Kantin' */
+                const [auditCanteenProc] = await connection.execute(
+                    sqlStatusHistory,
+                    [id, preorderStatus, changedAt, null, req.user.id]
+                );
+
+                if (auditCanteenProc.affectedRows === 0) {
+                    await connection.rollback();
+                    throw new Error('failed executing audit canteen process');
+                }
             } else {
                 /* Jika role bukan Dekan atau BAK, throw error */
                 return httpResponse(
@@ -240,16 +304,47 @@ const getPreorders = async (req, res) => {
 
         const offset = (page - 1) * limit;
 
-        let filterStatus = '';
-        if (isEqual(role, ROLES.DEKAN)) {
-            filterStatus = replacePlaceholders(PO_STAT.PENDING, [ROLES.DEKAN]);
-        } else if (isEqual(role, ROLES.BAK)) {
-            filterStatus = replacePlaceholders(PO_STAT.PENDING, [ROLES.BAK]);
-        } else if (isEqual(role, ROLES.TU)) {
-            filterStatus = `%%`;
-        } else if (isEqual(role, ROLES.ADMIN)) {
-            filterStatus = PO_STAT.CANTEEN_PROCESS;
+        const [checkExpPO] = await db.execute(
+            `SELECT CONVERT_TZ(cpo.event_date, '+00:00', 'Asia/Jakarta') AS eventDate 
+            FROM canteen_preorders WHERE faculty_id = ?`,
+            [req.user.facultyId]
+        );
+
+        for (const po of checkExpPO) {
+            const dayDifference = getDayDifference(po.eventDate);
+            if (dayDifference < 7) {
+                const [setRejectBySystem] = await db.execute(
+                    `UPDATE canteen_preorders SET status = ? WHERE id = ?`,
+                    [PO_STAT.REJECT_BY_SYSTEM, po.id]
+                );
+                if (setRejectBySystem.affectedRows === 0) {
+                    throw new Error('failed updating to reject by system');
+                }
+            }
         }
+
+        let filterStatusQuery = '';
+        if (isEqual(role, ROLES.BAK)) {
+            // Filter for BAK role: Preorders with status 'Menunggu Persetujuan BAK' in status history
+            filterStatusQuery = `
+                AND EXISTS (
+                    SELECT 1
+                    FROM canteen_preorder_status_history cposh
+                    WHERE cposh.preorder_id = cpo.id
+                    AND cposh.status = '${replacePlaceholders(PO_STAT.PENDING, [
+                        ROLES.BAK,
+                    ])}'
+                )
+            `;
+        } else if (isEqual(role, ROLES.ADMIN)) {
+            // Filter for Admin role: Only show preorders with status 'Menunggu Proses Kantin'
+            filterStatusQuery = `AND cpo.status = '${PO_STAT.CANTEEN_PROCESS}'`;
+        }
+
+        // Add condition to exclude records with status 'Ditolak oleh Sistem'
+        const excludeRejectedBySystemQuery = `
+         AND cpo.status != '${PO_STAT.REJECT_BY_SYSTEM}'
+     `;
 
         const [rows] = await db.execute(
             `SELECT 
@@ -266,58 +361,25 @@ const getPreorders = async (req, res) => {
                 canteen_preorder_detail cpod ON cpo.id = cpod.preorder_id
             WHERE
                 cpo.faculty_id = ?
-            AND cpo.status LIKE ?
+                ${filterStatusQuery}
+                ${excludeRejectedBySystemQuery}
             GROUP BY 
                 cpo.id
             ORDER BY
-                cpo.created_at DESC
+                cpo.id DESC
             LIMIT ${limit}
             OFFSET ${offset}
-
- `,
-            [req.user.facultyId, filterStatus]
+            `,
+            [req.user.facultyId]
         );
 
-        /* Looping row result */
-        for (const row of rows) {
-            /* Lakukan pengecekan jika event_date (tanggal acara) dan hari ini berjarak kurang dari 7 hari */
-            /* Dan status nya 'Ditolak' yang artinya PO ini tidak diajukan ulang sehingga melebihi batas minimum tenggat waktu pengajuan */
-            const dayDifference = getDayDifference(row.event_date);
-            if (
-                dayDifference >= 0 &&
-                dayDifference < 7 &&
-                isContains(row.status, PO_STAT.REJECT)
-            ) {
-                /* Maka ubah statusnya menjadi 'Ditolak oleh Sistem' */
-                const [updateStatusRejBySystem] = await db.execute(
-                    `UPDATE canteen_preorders SET status = ? WHERE id = ?`,
-                    [PO_STAT.REJECT_BY_SYSTEM, row.id]
-                );
-
-                if (updateStatusRejBySystem.affectedRows === 0) {
-                    throw new Error(
-                        'failed executing update status to reject by system'
-                    );
-                }
-            }
-        }
-
-        /* Filter row result sehingga yang dikirim ke frontend adalah result yang statusnya bukan 'Ditolak oleh Sistem' */
-        const filteredRows = rows.filter((row) => {
-            return row.status !== PO_STAT.REJECT_BY_SYSTEM;
-        });
-
-        const pagination = buildPaginationData(
-            limit,
-            page,
-            filteredRows.length
-        );
+        const pagination = buildPaginationData(limit, page, rows.length);
 
         return httpResponse(
             res,
             httpStatus.OK,
             'get preorder data',
-            filteredRows,
+            rows,
             pagination
         );
     } catch (error) {
@@ -372,6 +434,18 @@ const editPreorder = async (req, res) => {
             `UPDATE canteen_preorders SET event_date = ?, status = ?, request_count = request_count + 1, reject_reason = NULL WHERE id = ?`,
             [eventDate, pendingStatus, id]
         );
+
+        const changedAt = getCurrentTime();
+        const [auditStatusHistory] = await connection.execute(
+            `INSERT INTO canteen_preorder_status_history (preorder_id, status, changed_at, reject_reason, approver_id)
+            VALUES (?, ?, ?, ?, ?)`,
+            [id, pendingStatus, changedAt, null, req.user.id]
+        );
+
+        if (auditStatusHistory.affectedRows === 0) {
+            await connection.rollback();
+            throw new Error('failed executing audit status history');
+        }
 
         if (updatePreorder.affectedRows === 0) {
             await connection.rollback();
@@ -436,7 +510,7 @@ const getStatusHistory = async (req, res) => {
             WHERE 
                 cph.preorder_id = ?
             ORDER BY 
-                cph.changed_at DESC;
+                cph.id DESC;
  `,
             [id]
         );
