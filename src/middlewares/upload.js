@@ -72,6 +72,20 @@ const storage = multer.diskStorage({
     },
 });
 
-const upload = multer({ storage });
+// File filter to validate that the uploaded file is an Excel file
+const fileFilter = (req, file, cb) => {
+    // Allow only Excel files
+    if (
+        file.mimetype ===
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+        file.mimetype === 'application/vnd.ms-excel'
+    ) {
+        cb(null, true); // Accept file
+    } else {
+        cb(new Error('Only Excel files are allowed!'), false); // Reject file
+    }
+};
+
+const upload = multer({ storage, fileFilter: fileFilter });
 
 module.exports = upload;

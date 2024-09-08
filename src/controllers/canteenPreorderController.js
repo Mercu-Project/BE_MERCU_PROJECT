@@ -22,6 +22,12 @@ const submitPreorder = async (req, res) => {
     let connection;
     try {
         let { eventDate, preorderTypes } = req.body;
+        const attachmentPath = req.file ? req.file.path : null; // Save the file path if a file is uploaded
+
+        // Parse preorderTypes from JSON string if necessary
+        if (typeof preorderTypes === 'string') {
+            preorderTypes = JSON.parse(preorderTypes);
+        }
 
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
@@ -68,7 +74,7 @@ const submitPreorder = async (req, res) => {
         ]);
 
         const [newPreorder] = await connection.execute(
-            'INSERT INTO canteen_preorders (requester_id, event_date, request_count, status, number, faculty_id) VALUES (?, ?, ?, ?, ?, ?)',
+            'INSERT INTO canteen_preorders (requester_id, event_date, request_count, status, number, faculty_id, attachment_path) VALUES (?, ?, ?, ?, ?, ?, ?)',
             [
                 req.user.id,
                 eventDate,
@@ -76,6 +82,7 @@ const submitPreorder = async (req, res) => {
                 pendingStatus,
                 nomorPengajuan,
                 req.user.facultyId,
+                attachmentPath,
             ]
         );
 

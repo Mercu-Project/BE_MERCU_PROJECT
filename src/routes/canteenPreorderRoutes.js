@@ -7,11 +7,13 @@ const {
     approvalPreorderValidator,
 } = require('../validators/canteenPreorderValidator');
 const { ROLES } = require('../utils/constants');
+const upload = require('../middlewares/upload');
 
 router.post(
     '/submit-preorder',
     auth,
     checkRole(ROLES.TU),
+    upload.single('file'),
     submissionValidator,
     CanteenPreorder.submitPreorder
 );
