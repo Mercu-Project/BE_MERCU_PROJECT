@@ -22,12 +22,13 @@ const submitPreorder = async (req, res) => {
     let connection;
     try {
         let { eventDate, preorderTypes } = req.body;
-        const attachmentPath = req.file ? req.file.path : null; // Save the file path if a file is uploaded
+        // const attachmentPath = req.file ? req.file.path : null; // Save the file path if a file is uploaded
+        const attachmentPath = null; // Save the file path if a file is uploaded
 
         // Parse preorderTypes from JSON string if necessary
-        if (typeof preorderTypes === 'string') {
-            preorderTypes = JSON.parse(preorderTypes);
-        }
+        // if (typeof preorderTypes === 'string') {
+        //     preorderTypes = JSON.parse(preorderTypes);
+        // }
 
         const errors = validationResult(req);
         if (!errors.isEmpty()) {

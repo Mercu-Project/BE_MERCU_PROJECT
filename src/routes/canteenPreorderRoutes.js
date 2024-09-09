@@ -13,7 +13,6 @@ router.post(
     '/submit-preorder',
     auth,
     checkRole(ROLES.TU),
-    upload.single('file'),
     submissionValidator,
     CanteenPreorder.submitPreorder
 );
