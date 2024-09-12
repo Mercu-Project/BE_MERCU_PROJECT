@@ -13,5 +13,11 @@ router.get(
 router.delete('/reset-last-scanning-qr', CanteenScan.resetLastScanningQR);
 router.get('/get-stats', auth, checkRole('Admin'), CanteenScan.getStatistics);
 router.get('/export', auth, checkRole('Admin'), CanteenScan.exportCanteenScan);
+router.get(
+    '/get-scanned',
+    auth,
+    checkRole('Admin'),
+    CanteenScan.getScannedData
+);
 
 module.exports = router;

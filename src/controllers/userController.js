@@ -81,7 +81,7 @@ const getUsers = async (req, res) => {
 const registerUser = async (req, res) => {
     let connection;
     try {
-        const { username, password, full_name } = req.body;
+        const { username, password, full_name, nik, unit } = req.body;
 
         const [oldUsername] = await db.execute(
             'SELECT username, password FROM accounts WHERE username = ?',
@@ -114,8 +114,8 @@ const registerUser = async (req, res) => {
         const accountId = newAccount.insertId;
 
         const [newUser] = await db.execute(
-            'INSERT INTO users (full_name, account_id) VALUES (?, ?)',
-            [full_name, accountId]
+            'INSERT INTO users (full_name, account_id, nik, unit) VALUES (?, ?, ?, ?)',
+            [full_name, accountId, nik, unit]
         );
 
         if (newUser.affectedRows === 0) {

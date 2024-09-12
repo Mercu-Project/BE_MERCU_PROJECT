@@ -4,6 +4,7 @@ const { validationResult } = require('express-validator');
 const httpStatus = require('http-status');
 const moment = require('moment-timezone');
 const ExcelJS = require('exceljs');
+const { buildPaginationData } = require('../utils/pagination');
 
 const inputScan = async (req, res) => {
     try {
@@ -385,10 +386,53 @@ const exportCanteenScan = async (req, res) => {
     }
 };
 
+const getScannedData = async (req, res) => {
+    try {
+        const { from, to, limit = 10, page = 1 } = req.query;
+        const offset = (page - 1) * limit;
+
+        const [[{ total }]] = await db.execute(
+            `
+                SELECT COUNT(DISTINCT u.id) AS total
+                FROM users u
+                LEFT JOIN canteen_scans cs ON u.account_id = cs.account_id
+                WHERE CONVERT_TZ(cs.created_at, '+00:00', '+07:00') BETWEEN ? AND ?
+            `,
+            [from, to]
+        );
+
+        const [rows] = await db.execute(
+            `
+                SELECT u.full_name AS Nama, u.nik as Nik, u.unit AS Unit, COUNT(cs.id) AS JumlahScan
+                FROM users u
+                LEFT JOIN canteen_scans cs ON u.account_id = cs.account_id
+                WHERE CONVERT_TZ(cs.created_at, '+00:00', '+07:00') BETWEEN ? AND ?
+                GROUP BY u.id
+                ORDER BY cs.created_at DESC
+                LIMIT ${limit} OFFSET ${offset} 
+            `,
+            [from, to]
+        );
+
+        const pagination = buildPaginationData(limit, page, total);
+
+        return httpResponse(
+            res,
+            httpStatus.OK,
+            'Get scanned data',
+            rows,
+            pagination
+        );
+    } catch (error) {
+        return serverErrorResponse(res, error);
+    }
+};
+
 module.exports = {
     inputScan,
     getLastScanningQr,
     resetLastScanningQR,
     getStatistics,
     exportCanteenScan,
+    getScannedData,
 };
