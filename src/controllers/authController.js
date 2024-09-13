@@ -139,7 +139,7 @@ const login = async (req, res) => {
 
         const [rows] = await db.execute(
             `SELECT u.id, u.username, u.password, u.role_id, u.faculty_id, f.name AS faculty_name 
-            FROM accounts u JOIN faculties f ON f.id = u.faculty_id WHERE username = ?`,
+            FROM accounts u LEFT JOIN faculties f ON f.id = u.faculty_id WHERE username = ?`,
             [username]
         );
 
