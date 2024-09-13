@@ -15,8 +15,8 @@ router.get('/get-stats', auth, checkRole('Admin'), CanteenScan.getStatistics);
 router.get('/export', auth, checkRole('Admin'), CanteenScan.exportCanteenScan);
 router.get(
     '/get-scanned',
-    auth,
-    checkRole('Admin'),
+    // auth,
+    // checkRole('Admin'),
     CanteenScan.getScannedData
 );
 
