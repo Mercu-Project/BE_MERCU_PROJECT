@@ -403,12 +403,12 @@ const getScannedData = async (req, res) => {
 
         const [rows] = await db.execute(
             `
-                SELECT u.full_name AS Nama, u.unit AS Unit, COUNT(cs.id) AS JumlahScan
+                SELECT u.full_name AS Nama, u.unit AS Unit, COUNT(cs.id) AS JumlahScan, cs.created_at
                 FROM users u
                 LEFT JOIN canteen_scans cs ON u.account_id = cs.account_id
                 WHERE CONVERT_TZ(cs.created_at, '+00:00', '+07:00') BETWEEN ? AND ?
                 GROUP BY u.id
-                ORDER BY cs.created_at DESC
+                ORDER BY JumlahScan DESC
                 LIMIT ${limit} OFFSET ${offset} 
             `,
             [from, to]
