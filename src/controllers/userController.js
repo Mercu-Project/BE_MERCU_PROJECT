@@ -34,7 +34,8 @@ const getUsers = async (req, res) => {
                 THEN 'Aktif'
                 ELSE 'Tidak Aktif'
                 END AS status,
-                acc.username AS unique_id
+                acc.username AS unique_id,
+                u.unit
             FROM
                 users u
             JOIN accounts acc ON u.account_id = acc.id

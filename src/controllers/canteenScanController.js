@@ -314,13 +314,31 @@ const exportCanteenScan = async (req, res) => {
     try {
         const { from, to } = req.query;
 
+        // const [rows] = await db.execute(
+        //     `
+        //         SELECT u.full_name AS Nama, COUNT(cs.id) AS JumlahScan
+        //         FROM users u
+        //         LEFT JOIN canteen_scans cs ON u.account_id = cs.account_id
+        //         WHERE CONVERT_TZ(cs.created_at, '+00:00', '+07:00') BETWEEN ? AND ?
+        //         GROUP BY u.id
+        //     `,
+        //     [from, to]
+        // );
+
         const [rows] = await db.execute(
             `
-                SELECT u.full_name AS Nama, COUNT(cs.id) AS JumlahScan
+                SELECT u.full_name AS Nama, IFNULL(u.unit, '-') AS Unit, COUNT(cs.id) AS JumlahScan, 
+                    CONCAT(
+                        DATE_FORMAT(MIN(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta')), '%e %b %Y'), ' - ', 
+                        DATE_FORMAT(MAX(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta')), '%e %b %Y')
+                    ) AS ScanDates
                 FROM users u
                 LEFT JOIN canteen_scans cs ON u.account_id = cs.account_id
-                WHERE CONVERT_TZ(cs.created_at, '+00:00', '+07:00') BETWEEN ? AND ?
+                WHERE DATE(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta')) BETWEEN ? AND ?
                 GROUP BY u.id
+                ORDER BY JumlahScan DESC
+                LIMIT ${limit} OFFSET ${offset}
+
             `,
             [from, to]
         );
@@ -332,6 +350,8 @@ const exportCanteenScan = async (req, res) => {
             { header: 'No', key: 'No', width: 10 },
             { header: 'Nama', key: 'Nama', width: 30 },
             { header: 'Jumlah Scan', key: 'JumlahScan', width: 15 },
+            { header: 'Unit', key: 'Unit', width: 15 },
+            { header: 'Rentang Tanggal Scan', key: 'ScanDates', width: 15 },
         ];
 
         worksheet.getRow(1).eachCell((cell) => {
@@ -403,13 +423,18 @@ const getScannedData = async (req, res) => {
 
         const [rows] = await db.execute(
             `
-                SELECT u.full_name AS Nama, u.unit AS Unit, COUNT(cs.id) AS JumlahScan
+                SELECT u.full_name AS Nama, IFNULL(u.unit, '-') AS Unit, COUNT(cs.id) AS JumlahScan, 
+                    CONCAT(
+                        DATE_FORMAT(MIN(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta')), '%e %b %Y'), ' - ', 
+                        DATE_FORMAT(MAX(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta')), '%e %b %Y')
+                    ) AS ScanDates
                 FROM users u
                 LEFT JOIN canteen_scans cs ON u.account_id = cs.account_id
-                WHERE CONVERT_TZ(cs.created_at, '+00:00', '+07:00') BETWEEN ? AND ?
+                WHERE DATE(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta')) BETWEEN ? AND ?
                 GROUP BY u.id
                 ORDER BY JumlahScan DESC
-                LIMIT ${limit} OFFSET ${offset} 
+                LIMIT ${limit} OFFSET ${offset}
+
             `,
             [from, to]
         );
