@@ -4,7 +4,12 @@ const auth = require('../middlewares/auth');
 const checkRole = require('../middlewares/checkRole');
 const { ROLES } = require('../utils/constants');
 
-router.post('/input-scan', auth, checkRole(ROLES.BAK), CanteenScan.inputScan);
+router.post(
+    '/input-scan',
+    auth,
+    checkRole([ROLES.BAK, ROLES.ADMIN]),
+    CanteenScan.inputScan
+);
 router.get(
     '/last-scanning-qr',
     auth,
@@ -15,10 +20,15 @@ router.delete('/reset-last-scanning-qr', CanteenScan.resetLastScanningQR);
 router.get(
     '/get-stats',
     auth,
-    checkRole([ROLES.BAK]),
+    checkRole([ROLES.BAK, ROLES.ADMIN]),
     CanteenScan.getStatistics
 );
-router.get('/export', auth, checkRole('Admin'), CanteenScan.exportCanteenScan);
+router.get(
+    '/export',
+    auth,
+    checkRole([ROLES.BAK, ROLES.ADMIN]),
+    CanteenScan.exportCanteenScan
+);
 router.get(
     '/get-scanned',
     auth,
