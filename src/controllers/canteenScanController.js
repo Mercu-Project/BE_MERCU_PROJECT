@@ -123,7 +123,8 @@ const getLastScanningQr = async (req, res) => {
             `
                 SELECT
                     acc.username AS nim,
-                    u.full_name AS fullName
+                    u.full_name AS fullName,
+                    cs.scanned_at AS scannedAt
                 FROM 
                     accounts acc
                 JOIN users u ON acc.id = u.account_id
@@ -131,7 +132,7 @@ const getLastScanningQr = async (req, res) => {
                 WHERE DATE(cs.created_at) = CURDATE()
                 ORDER BY
                     cs.created_at
-                DESC LIMIT 5
+                DESC
             `
         );
 
