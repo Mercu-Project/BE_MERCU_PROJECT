@@ -39,7 +39,7 @@ module.exports = {
         ADMIN: 'Admin',
         USER: 'User',
         DEKAN: 'Dekan',
-        BAK: 'BAK',
+        BAK: 'SDM',
     },
 
     /* Date Format Type */
