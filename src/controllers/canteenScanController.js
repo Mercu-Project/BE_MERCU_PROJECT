@@ -311,317 +311,6 @@ const getStatistics = async (req, res) => {
     }
 };
 
-// const exportCanteenScan = async (req, res) => {
-//     try {
-//         const { from, to } = req.query;
-
-//         // const [rows] = await db.execute(
-//         //     `
-//         //         SELECT u.full_name AS Nama, COUNT(cs.id) AS JumlahScan
-//         //         FROM users u
-//         //         LEFT JOIN canteen_scans cs ON u.account_id = cs.account_id
-//         //         WHERE CONVERT_TZ(cs.created_at, '+00:00', '+07:00') BETWEEN ? AND ?
-//         //         GROUP BY u.id
-//         //     `,
-//         //     [from, to]
-//         // );
-
-//         const [rows] = await db.execute(
-//             `
-//                 SELECT u.full_name AS Nama, IFNULL(u.unit, '-') AS Unit, COUNT(cs.id) AS JumlahScan,
-//                     CONCAT(
-//                         DATE_FORMAT(MIN(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta')), '%e %b %Y'), ' - ',
-//                         DATE_FORMAT(MAX(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta')), '%e %b %Y')
-//                     ) AS ScanDates
-//                 FROM users u
-//                 LEFT JOIN canteen_scans cs ON u.account_id = cs.account_id
-//                 WHERE DATE(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta')) BETWEEN ? AND ?
-//                 GROUP BY u.id
-//                 ORDER BY JumlahScan DESC
-//                 LIMIT ${limit} OFFSET ${offset}
-
-//             `,
-//             [from, to]
-//         );
-
-//         const workbook = new ExcelJS.Workbook();
-//         const worksheet = workbook.addWorksheet('Canteen Scan');
-
-//         worksheet.columns = [
-//             { header: 'No', key: 'No', width: 10 },
-//             { header: 'Nama', key: 'Nama', width: 30 },
-//             { header: 'Jumlah Scan', key: 'JumlahScan', width: 15 },
-//             { header: 'Unit', key: 'Unit', width: 15 },
-//             { header: 'Rentang Tanggal Scan', key: 'ScanDates', width: 15 },
-//         ];
-
-//         worksheet.getRow(1).eachCell((cell) => {
-//             cell.font = { bold: true };
-//             cell.alignment = { vertical: 'middle', horizontal: 'center' };
-//             cell.border = {
-//                 top: { style: 'thin' },
-//                 left: { style: 'thin' },
-//                 bottom: { style: 'thin' },
-//                 right: { style: 'thin' },
-//             };
-//         });
-
-//         rows.forEach((row, index) => {
-//             const newRow = worksheet.addRow({ No: index + 1, ...row });
-//             newRow.eachCell((cell) => {
-//                 cell.alignment = { vertical: 'middle', horizontal: 'center' };
-//                 cell.border = {
-//                     top: { style: 'thin' },
-//                     left: { style: 'thin' },
-//                     bottom: { style: 'thin' },
-//                     right: { style: 'thin' },
-//                 };
-//             });
-//         });
-
-//         const column = worksheet.getColumn('Nama');
-//         let maxLength = 30; // default width
-//         rows.forEach((row) => {
-//             if (row.Nama.length > maxLength) {
-//                 maxLength = row.Nama.length + 5;
-//             }
-//         });
-//         column.width = maxLength;
-
-//         const filename =
-//             'canteen_scans_' +
-//             moment().tz('Asia/Jakarta').format('YYYYMMDDHHmmss');
-
-//         const buffer = await workbook.xlsx.writeBuffer();
-//         res.setHeader(
-//             'Content-Disposition',
-//             `attachment; filename="${filename}.xlsx"`
-//         );
-//         res.setHeader(
-//             'Content-Type',
-//             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-//         );
-//         res.send(buffer);
-//     } catch (error) {
-//         return serverErrorResponse(res, error);
-//     }
-// };
-
-// const exportCanteenScan = async (req, res) => {
-//     try {
-//         const { from, to } = req.query;
-
-//         const [rows] = await db.execute(
-//             `
-//                 SELECT u.full_name AS Nama, IFNULL(u.unit, '-') AS Unit, COUNT(cs.id) AS JumlahScan,
-//                     CONCAT(
-//                         DATE_FORMAT(MIN(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta')), '%e %b %Y'), ' - ',
-//                         DATE_FORMAT(MAX(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta')), '%e %b %Y')
-//                     ) AS ScanDates
-//                 FROM users u
-//                 LEFT JOIN canteen_scans cs ON u.account_id = cs.account_id
-//                 WHERE DATE(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta')) BETWEEN ? AND ?
-//                 GROUP BY u.id
-//                 ORDER BY JumlahScan DESC
-//             `,
-//             [from, to]
-//         );
-
-//         const workbook = new ExcelJS.Workbook();
-//         const worksheet = workbook.addWorksheet('Canteen Scan');
-
-//         // Format the 'from' and 'to' dates to Indonesian format
-//         const formattedFrom = moment(from)
-//             .tz('Asia/Jakarta')
-//             .format('D MMM YYYY');
-//         const formattedTo = moment(to).tz('Asia/Jakarta').format('D MMM YYYY');
-//         const mergedHeader = `Rentang Tanggal Waktu: ${formattedFrom} - ${formattedTo}`;
-
-//         // Add a merged header row
-//         worksheet.addRow([mergedHeader]);
-//         worksheet.getRow(1).font = { bold: true };
-//         worksheet.getRow(1).alignment = {
-//             vertical: 'middle',
-//             horizontal: 'left',
-//         };
-
-//         // Merge cells for the merged header row (across 4 columns instead of 5)
-//         // Adjusted to merge only across 4 columns (No, Nama, Jumlah Scan, Unit)
-//         worksheet.mergeCells('A1:D1');
-
-//         // Add a spacer row
-//         worksheet.addRow([]);
-
-//         // Add your column headers after the merged row and spacer
-//         // Ensure headers are added correctly
-//         worksheet.columns = [
-//             { header: 'No', key: 'No', width: 10 },
-//             { header: 'Nama', key: 'Nama', width: 30 },
-//             { header: 'Jumlah Scan', key: 'JumlahScan', width: 15 },
-//             { header: 'Unit', key: 'Unit', width: 15 },
-//         ];
-
-//         // Add column headers manually since they disappear when merging cells
-//         worksheet.addRow(['No', 'Nama', 'Jumlah Scan', 'Unit']);
-
-//         // Apply styles to the header row (row 3)
-//         // Note that ExcelJS uses 1-based indexing for rows and columns
-//         worksheet.getRow(3).eachCell((cell) => {
-//             cell.font = { bold: true };
-//             cell.alignment = { vertical: 'middle', horizontal: 'center' };
-//             cell.border = {
-//                 top: { style: 'thin' },
-//                 left: { style: 'thin' },
-//                 bottom: { style: 'thin' },
-//                 right: { style: 'thin' },
-//             };
-//         });
-
-//         // Add rows from your data
-//         rows.forEach((row, index) => {
-//             const newRow = worksheet
-//                 .getRow(index + 3 + 1)
-//                 .addRow({ No: index + 1, ...row });
-//             newRow.eachCell((cell) => {
-//                 cell.alignment = { vertical: 'middle', horizontal: 'center' };
-//                 cell.border = {
-//                     top: { style: 'thin' },
-//                     left: { style: 'thin' },
-//                     bottom: { style: 'thin' },
-//                     right: { style: 'thin' },
-//                 };
-//             });
-//         });
-
-//         // Adjust column width for 'Nama'
-//         const column = worksheet.getColumn('Nama');
-//         let maxLength = 30;
-//         rows.forEach((row) => {
-//             if (row.Nama.length > maxLength) {
-//                 maxLength = row.Nama.length + 5;
-//             }
-//         });
-//         column.width = maxLength;
-
-//         const filename =
-//             'canteen_scans_' +
-//             moment().tz('Asia/Jakarta').format('YYYYMMDDHHmmss');
-
-//         const buffer = await workbook.xlsx.writeBuffer();
-//         res.setHeader(
-//             'Content-Disposition',
-//             `attachment; filename="${filename}.xlsx"`
-//         );
-//         res.setHeader(
-//             'Content-Type',
-//             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-//         );
-//         res.send(buffer);
-//     } catch (error) {
-//         return serverErrorResponse(res, error);
-//     }
-// };
-
-// const exportCanteenScan = async (req, res) => {
-//     try {
-//         const { from, to } = req.query;
-
-//         const [rows] = await db.execute(
-//             `
-//                 SELECT u.full_name AS Nama, IFNULL(u.unit, '-') AS Unit, COUNT(cs.id) AS JumlahScan,
-//                     CONCAT(
-//                         DATE_FORMAT(MIN(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta')), '%e %b %Y'), ' - ',
-//                         DATE_FORMAT(MAX(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta')), '%e %b %Y')
-//                     ) AS ScanDates
-//                 FROM users u
-//                 LEFT JOIN canteen_scans cs ON u.account_id = cs.account_id
-//                 WHERE DATE(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta')) BETWEEN ? AND ?
-//                 GROUP BY u.id
-//                 ORDER BY JumlahScan DESC
-//             `,
-//             [from, to]
-//         );
-
-//         const workbook = new ExcelJS.Workbook();
-//         const worksheet = workbook.addWorksheet('Canteen Scan');
-
-//         const formattedFrom = moment(from)
-//             .tz('Asia/Jakarta')
-//             .format('D MMM YYYY');
-//         const formattedTo = moment(to).tz('Asia/Jakarta').format('D MMM YYYY');
-//         const mergedHeader = `Rentang Tanggal Waktu: ${formattedFrom} - ${formattedTo}`;
-
-//         worksheet.addRow([mergedHeader]);
-//         worksheet.getRow(1).font = { bold: true };
-//         worksheet.getRow(1).alignment = {
-//             vertical: 'middle',
-//             horizontal: 'left',
-//         };
-
-//         worksheet.addRow([]);
-
-//         worksheet.addRow(['No', 'Nama', 'Jumlah Scan', 'Unit']);
-
-//         worksheet.getRow(3).eachCell((cell) => {
-//             cell.font = { bold: true };
-//             cell.alignment = { vertical: 'middle', horizontal: 'center' };
-//             cell.border = {
-//                 top: { style: 'thin' },
-//                 left: { style: 'thin' },
-//                 bottom: { style: 'thin' },
-//                 right: { style: 'thin' },
-//             };
-//         });
-
-//         rows.forEach((row, index) => {
-//             const newRow = worksheet.addRow([
-//                 index + 1,
-//                 row.Nama,
-//                 row.JumlahScan,
-//                 row.Unit,
-//             ]);
-//             newRow.eachCell((cell) => {
-//                 cell.alignment = { vertical: 'middle', horizontal: 'center' };
-//                 cell.border = {
-//                     top: { style: 'thin' },
-//                     left: { style: 'thin' },
-//                     bottom: { style: 'thin' },
-//                     right: { style: 'thin' },
-//                 };
-//             });
-//         });
-
-//         worksheet.columns = [
-//             { header: mergedHeader, key: '-', width: 25 },
-//             { header: 'No', key: 'no', width: 5 },
-//             {
-//                 header: 'Nama',
-//                 key: 'Nama',
-//                 width: Math.max(...rows.map((row) => row.Nama.length), 10) + 2,
-//             },
-//             { header: 'Jumlah Scan', key: 'JumlahScan', width: 15 },
-//             { header: 'Unit', key: 'Unit', width: 10 },
-//         ];
-
-//         const filename =
-//             'canteen_scans_' +
-//             moment().tz('Asia/Jakarta').format('YYYYMMDDHHmmss');
-
-//         const buffer = await workbook.xlsx.writeBuffer();
-//         res.setHeader(
-//             'Content-Disposition',
-//             `attachment; filename="${filename}.xlsx"`
-//         );
-//         res.setHeader(
-//             'Content-Type',
-//             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-//         );
-//         res.send(buffer);
-//     } catch (error) {
-//         return serverErrorResponse(res, error);
-//     }
-// };
-
 const exportCanteenScan = async (req, res) => {
     try {
         const { from, to } = req.query;
@@ -632,15 +321,20 @@ const exportCanteenScan = async (req, res) => {
                     CONCAT(
                         DATE_FORMAT(MIN(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta')), '%e %b %Y'), ' - ',
                         DATE_FORMAT(MAX(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta')), '%e %b %Y')
-                    ) AS ScanDates
+                    ) AS ScanDates,
+                     acc.username AS Nik
                 FROM users u
                 LEFT JOIN canteen_scans cs ON u.account_id = cs.account_id
+                JOIN accounts acc ON u.account_id = acc.id
                 WHERE DATE(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta')) BETWEEN ? AND ?
                 GROUP BY u.id
                 ORDER BY JumlahScan DESC
             `,
             [from, to]
         );
+
+        // Calculate the total sum of JumlahScan
+        const totalScan = rows.reduce((acc, row) => acc + row.JumlahScan, 0);
 
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Canteen Scan');
@@ -668,7 +362,7 @@ const exportCanteenScan = async (req, res) => {
         worksheet.addRow([]);
 
         // Add column headers manually since they disappear when merging cells
-        worksheet.addRow(['No', 'Nama', 'Jumlah Scan', 'Unit']);
+        worksheet.addRow(['No', 'Nama', 'NIK', 'Unit', 'Jumlah Scan']);
 
         // Apply styles to the header row (row 3)
         // Note that ExcelJS uses 1-based indexing for rows and columns
@@ -688,11 +382,16 @@ const exportCanteenScan = async (req, res) => {
             const newRow = worksheet.addRow([
                 index + 1,
                 row.Nama,
-                row.JumlahScan,
+                row.Nik,
                 row.Unit,
+                row.JumlahScan,
             ]);
-            newRow.eachCell((cell) => {
-                cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            newRow.eachCell((cell, colNumber) => {
+                cell.alignment = {
+                    vertical: 'middle',
+                    horizontal:
+                        colNumber === 2 || colNumber === 3 ? 'left' : 'center', // 'Nama' and 'NIK' left, others center
+                };
                 cell.border = {
                     top: { style: 'thin' },
                     left: { style: 'thin' },
@@ -701,6 +400,30 @@ const exportCanteenScan = async (req, res) => {
                 };
             });
         });
+
+        // Add the Total Scan row
+        worksheet.addRow([]); // Spacer row
+        const totalRow = worksheet.addRow([
+            '', // Empty cell for 'No'
+            '', // Empty cell for 'Nama'
+            '', // Empty cell for 'NIK'
+            'Total Scan',
+            totalScan, // Total Scan in 'Jumlah Scan' column
+        ]);
+
+        // Apply styles to the Total Scan row
+        totalRow.getCell(4).font = { bold: true }; // 'Total Scan' label
+        totalRow.getCell(4).alignment = {
+            vertical: 'middle',
+            horizontal: 'left',
+        };
+
+        totalRow.getCell(5).font = { bold: true }; // Total Scan value
+        totalRow.getCell(5).alignment = {
+            vertical: 'middle',
+            horizontal: 'center',
+        };
+        // No borders for the Total Scan value cell
 
         // Calculate the maximum length of 'Nama' values and adjust the width
         let maxLength = 30; // Default width
@@ -714,8 +437,9 @@ const exportCanteenScan = async (req, res) => {
         // Manually set column widths
         worksheet.getColumn(1).width = 10; // Width for 'No'
         worksheet.getColumn(2).width = maxLength; // Width for 'Nama'
-        worksheet.getColumn(3).width = 15; // Width for 'Jumlah Scan'
+        worksheet.getColumn(3).width = 15; // Width for 'NIK'
         worksheet.getColumn(4).width = 15; // Width for 'Unit'
+        worksheet.getColumn(5).width = 20; // Expanded width for 'Jumlah Scan'
 
         const filename =
             'canteen_scans_' +
@@ -757,9 +481,11 @@ const getScannedData = async (req, res) => {
                     CONCAT(
                         DATE_FORMAT(MIN(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta')), '%e %b %Y'), ' - ', 
                         DATE_FORMAT(MAX(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta')), '%e %b %Y')
-                    ) AS ScanDates
+                    ) AS ScanDates,
+                     acc.username AS Nik
                 FROM users u
                 LEFT JOIN canteen_scans cs ON u.account_id = cs.account_id
+                JOIN accounts acc ON u.account_id = acc.id
                 WHERE DATE(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta')) BETWEEN ? AND ?
                 GROUP BY u.id
                 ORDER BY JumlahScan DESC
