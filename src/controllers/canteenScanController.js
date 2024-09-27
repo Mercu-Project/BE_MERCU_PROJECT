@@ -317,24 +317,25 @@ const exportCanteenScan = async (req, res) => {
 
         const [rows] = await db.execute(
             `
-                SELECT u.full_name AS Nama, IFNULL(u.unit, '-') AS Unit, COUNT(cs.id) AS JumlahScan,
+                SELECT 
+                    u.full_name AS Nama, 
+                    IFNULL(u.unit, '-') AS Unit,
                     CONCAT(
-                        DATE_FORMAT(MIN(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta')), '%e %b %Y'), ' - ',
-                        DATE_FORMAT(MAX(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta')), '%e %b %Y')
-                    ) AS ScanDates,
-                     acc.username AS Nik
+                        DATE_FORMAT(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta'), '%e %b %Y'), ' ',
+                        IFNULL(TIME_FORMAT(cs.scanned_at, '%H:%i:%s'), '')
+                    ) AS ScanDate,
+                    acc.username AS Nik
                 FROM users u
                 LEFT JOIN canteen_scans cs ON u.account_id = cs.account_id
                 JOIN accounts acc ON u.account_id = acc.id
                 WHERE DATE(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta')) BETWEEN ? AND ?
-                GROUP BY u.id
-                ORDER BY JumlahScan DESC
+                ORDER BY cs.created_at DESC
             `,
             [from, to]
         );
 
         // Calculate the total sum of JumlahScan
-        const totalScan = rows.reduce((acc, row) => acc + row.JumlahScan, 0);
+        const totalScan = rows.length;
 
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Canteen Scan');
@@ -362,7 +363,7 @@ const exportCanteenScan = async (req, res) => {
         worksheet.addRow([]);
 
         // Add column headers manually since they disappear when merging cells
-        worksheet.addRow(['No', 'Nama', 'NIK', 'Unit', 'Jumlah Scan']);
+        worksheet.addRow(['No', 'Nama', 'NIK', 'Unit', 'Tanggal Scan']);
 
         // Apply styles to the header row (row 3)
         // Note that ExcelJS uses 1-based indexing for rows and columns
@@ -384,7 +385,7 @@ const exportCanteenScan = async (req, res) => {
                 row.Nama,
                 row.Nik,
                 row.Unit,
-                row.JumlahScan,
+                row.ScanDate,
             ]);
             newRow.eachCell((cell, colNumber) => {
                 cell.alignment = {
@@ -408,7 +409,7 @@ const exportCanteenScan = async (req, res) => {
             '', // Empty cell for 'Nama'
             '', // Empty cell for 'NIK'
             'Total Scan',
-            totalScan, // Total Scan in 'Jumlah Scan' column
+            totalScan, // Total Scan in 'Tanggal Scan' column
         ]);
 
         // Apply styles to the Total Scan row
@@ -439,7 +440,7 @@ const exportCanteenScan = async (req, res) => {
         worksheet.getColumn(2).width = maxLength; // Width for 'Nama'
         worksheet.getColumn(3).width = 15; // Width for 'NIK'
         worksheet.getColumn(4).width = 15; // Width for 'Unit'
-        worksheet.getColumn(5).width = 20; // Expanded width for 'Jumlah Scan'
+        worksheet.getColumn(5).width = 30; // Expanded width for 'Tanggal Scan'
 
         const filename =
             'canteen_scans_' +
@@ -467,9 +468,10 @@ const getScannedData = async (req, res) => {
 
         const [[{ total }]] = await db.execute(
             `
-                SELECT COUNT(DISTINCT u.id) AS total
+                SELECT COUNT(*) AS total
                 FROM users u
                 LEFT JOIN canteen_scans cs ON u.account_id = cs.account_id
+                JOIN accounts acc ON u.account_id = acc.id
                 WHERE CONVERT_TZ(cs.created_at, '+00:00', '+07:00') BETWEEN ? AND ?
             `,
             [from, to]
@@ -477,18 +479,19 @@ const getScannedData = async (req, res) => {
 
         const [rows] = await db.execute(
             `
-                SELECT u.full_name AS Nama, IFNULL(u.unit, '-') AS Unit, COUNT(cs.id) AS JumlahScan, 
+                SELECT 
+                    u.full_name AS Nama, 
+                    IFNULL(u.unit, '-') AS Unit,
                     CONCAT(
-                        DATE_FORMAT(MIN(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta')), '%e %b %Y'), ' - ', 
-                        DATE_FORMAT(MAX(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta')), '%e %b %Y')
-                    ) AS ScanDates,
-                     acc.username AS Nik
+                        DATE_FORMAT(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta'), '%e %b %Y'), ' ',
+                        IFNULL(TIME_FORMAT(cs.scanned_at, '%H:%i:%s'), '')
+                    ) AS ScanDate,
+                    acc.username AS Nik
                 FROM users u
                 LEFT JOIN canteen_scans cs ON u.account_id = cs.account_id
                 JOIN accounts acc ON u.account_id = acc.id
                 WHERE DATE(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta')) BETWEEN ? AND ?
-                GROUP BY u.id
-                ORDER BY JumlahScan DESC
+                ORDER BY cs.created_at DESC
                 LIMIT ${limit} OFFSET ${offset}
 
             `,
