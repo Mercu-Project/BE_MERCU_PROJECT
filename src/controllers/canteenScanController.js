@@ -328,10 +328,8 @@ const exportCanteenScan = async (req, res) => {
                     cs.sequence AS NoUrut,
                     u.full_name AS Nama, 
                     IFNULL(u.unit, '-') AS Unit,
-                    CONCAT(
-                        DATE_FORMAT(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta'), '%e %b %Y'), ' ',
-                        IFNULL(TIME_FORMAT(cs.scanned_at, '%H:%i:%s'), '')
-                    ) AS ScanDate,
+                    DATE_FORMAT(CONVERT_TZ(cs.created_at, '+00:00', 'Asia/Jakarta'), '%e %b %Y') AS Tanggal,
+                    IFNULL(TIME_FORMAT(cs.scanned_at, '%H:%i:%s'), '') AS Jam,
                     acc.username AS Nik
                 FROM users u
                 LEFT JOIN canteen_scans cs ON u.account_id = cs.account_id
@@ -365,7 +363,21 @@ const exportCanteenScan = async (req, res) => {
 
         // Merge cells for the merged header row (across 4 columns instead of 5)
         // Adjusted to merge only across 4 columns (No, Nama, Jumlah Scan, Unit)
-        worksheet.mergeCells('A1:D1');
+        worksheet.mergeCells('A1:E1');
+
+        // Add a spacer row
+        worksheet.addRow([]);
+
+        // Add "Total Scan" row at the top (before headers)
+        const totalRow = worksheet.addRow([
+            '', // Empty for 'No'
+            '', // Empty for 'Nama Karyawan'
+            '', // Empty for 'NIK'
+            '', // Empty for 'Unit'
+            '', // Title placed in 'Nomor Urut'
+            'Total Scan', // Empty for 'Tanggal'
+            totalScan, // Total Scan value in 'Waktu Pemindaian'
+        ]);
 
         // Add a spacer row
         worksheet.addRow([]);
@@ -378,11 +390,12 @@ const exportCanteenScan = async (req, res) => {
             'Unit',
             'Nomor Urut',
             'Tanggal Scan',
+            'Waktu Scan',
         ]);
 
         // Apply styles to the header row (row 3)
         // Note that ExcelJS uses 1-based indexing for rows and columns
-        worksheet.getRow(3).eachCell((cell) => {
+        worksheet.getRow(5).eachCell((cell) => {
             cell.font = { bold: true };
             cell.alignment = { vertical: 'middle', horizontal: 'center' };
             cell.border = {
@@ -401,7 +414,8 @@ const exportCanteenScan = async (req, res) => {
                 row.Nik,
                 row.Unit,
                 row.NoUrut,
-                row.ScanDate,
+                row.Tanggal,
+                row.Jam,
             ]);
             newRow.eachCell((cell, colNumber) => {
                 cell.alignment = {
@@ -418,25 +432,15 @@ const exportCanteenScan = async (req, res) => {
             });
         });
 
-        // Add the Total Scan row
-        worksheet.addRow([]); // Spacer row
-        const totalRow = worksheet.addRow([
-            '', // Empty cell for 'No'
-            '', // Empty cell for 'Nama'
-            '', // Empty cell for 'NIK'
-            'Total Scan',
-            totalScan, // Total Scan in 'Tanggal Scan' column
-        ]);
-
         // Apply styles to the Total Scan row
-        totalRow.getCell(5).font = { bold: true }; // 'Total Scan' label
-        totalRow.getCell(5).alignment = {
+        totalRow.getCell(6).font = { bold: true }; // 'Total Scan' label
+        totalRow.getCell(6).alignment = {
             vertical: 'middle',
             horizontal: 'left',
         };
 
-        totalRow.getCell(6).font = { bold: true }; // Total Scan value
-        totalRow.getCell(6).alignment = {
+        totalRow.getCell(7).font = { bold: true }; // Total Scan value
+        totalRow.getCell(7).alignment = {
             vertical: 'middle',
             horizontal: 'center',
         };
@@ -454,10 +458,11 @@ const exportCanteenScan = async (req, res) => {
         // Manually set column widths
         worksheet.getColumn(1).width = 10; // Width for 'No'
         worksheet.getColumn(2).width = maxLength; // Width for 'Nama'
-        worksheet.getColumn(3).width = 15; // Width for 'NIK'
+        worksheet.getColumn(3).width = 20; // Width for 'NIK'
         worksheet.getColumn(4).width = 15; // Width for 'Unit'
         worksheet.getColumn(5).width = 15; // Width for 'Nomor Urut'
         worksheet.getColumn(6).width = 30; // Expanded width for 'Tanggal Scan'
+        worksheet.getColumn(7).width = 15; // Width for 'Waktu Scan'
 
         const filename =
             'canteen_scans_' +
