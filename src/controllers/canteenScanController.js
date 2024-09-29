@@ -92,23 +92,30 @@ const inputScan = async (req, res) => {
             );
         }
 
-        let hideLength = userRows[0].username.length - 3;
-        let mask = 'x'.repeat(hideLength);
-        let hiddenNumber = userRows[0].username.substring(0, 3) + mask;
+        const [sequenceRows] = await db.execute(
+            `
+                SELECT COUNT(*) + 1 AS sequence
+                FROM canteen_scans
+                WHERE DATE(CONVERT_TZ(created_at, '+00:00', 'Asia/Jakarta')) = CURRENT_DATE
+            `
+        );
+
+        const sequence = sequenceRows[0].sequence;
 
         await db.execute(
             `
                 INSERT INTO canteen_scans
-                (account_id, scanned_at)
+                (account_id, scanned_at, sequence)
                 VALUES
-                (?, ?)
+                (?, ?, ?)
             `,
-            [userRows[0].id, scanned_at]
+            [userRows[0].id, scanned_at, sequence]
         );
 
         const response = {
-            nim: hiddenNumber,
+            nim: userRows[0].username,
             fullName: userRows[0].full_name,
+            noUrut: sequence,
         };
 
         return httpResponse(res, httpStatus.OK, 'scan success', response);
@@ -318,6 +325,7 @@ const exportCanteenScan = async (req, res) => {
         const [rows] = await db.execute(
             `
                 SELECT 
+                    cs.sequence AS NoUrut,
                     u.full_name AS Nama, 
                     IFNULL(u.unit, '-') AS Unit,
                     CONCAT(
@@ -363,7 +371,14 @@ const exportCanteenScan = async (req, res) => {
         worksheet.addRow([]);
 
         // Add column headers manually since they disappear when merging cells
-        worksheet.addRow(['No', 'Nama', 'NIK', 'Unit', 'Tanggal Scan']);
+        worksheet.addRow([
+            'No',
+            'Nama',
+            'NIK',
+            'Unit',
+            'Nomor Urut',
+            'Tanggal Scan',
+        ]);
 
         // Apply styles to the header row (row 3)
         // Note that ExcelJS uses 1-based indexing for rows and columns
@@ -385,6 +400,7 @@ const exportCanteenScan = async (req, res) => {
                 row.Nama,
                 row.Nik,
                 row.Unit,
+                row.NoUrut,
                 row.ScanDate,
             ]);
             newRow.eachCell((cell, colNumber) => {
@@ -413,14 +429,14 @@ const exportCanteenScan = async (req, res) => {
         ]);
 
         // Apply styles to the Total Scan row
-        totalRow.getCell(4).font = { bold: true }; // 'Total Scan' label
-        totalRow.getCell(4).alignment = {
+        totalRow.getCell(5).font = { bold: true }; // 'Total Scan' label
+        totalRow.getCell(5).alignment = {
             vertical: 'middle',
             horizontal: 'left',
         };
 
-        totalRow.getCell(5).font = { bold: true }; // Total Scan value
-        totalRow.getCell(5).alignment = {
+        totalRow.getCell(6).font = { bold: true }; // Total Scan value
+        totalRow.getCell(6).alignment = {
             vertical: 'middle',
             horizontal: 'center',
         };
@@ -440,7 +456,8 @@ const exportCanteenScan = async (req, res) => {
         worksheet.getColumn(2).width = maxLength; // Width for 'Nama'
         worksheet.getColumn(3).width = 15; // Width for 'NIK'
         worksheet.getColumn(4).width = 15; // Width for 'Unit'
-        worksheet.getColumn(5).width = 30; // Expanded width for 'Tanggal Scan'
+        worksheet.getColumn(5).width = 15; // Width for 'Nomor Urut'
+        worksheet.getColumn(6).width = 30; // Expanded width for 'Tanggal Scan'
 
         const filename =
             'canteen_scans_' +
@@ -480,6 +497,7 @@ const getScannedData = async (req, res) => {
         const [rows] = await db.execute(
             `
                 SELECT 
+                    cs.sequence AS NoUrut,
                     u.full_name AS Nama, 
                     IFNULL(u.unit, '-') AS Unit,
                     CONCAT(
