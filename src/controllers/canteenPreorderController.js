@@ -730,7 +730,7 @@ const getEventMember = async (req, res) => {
 
 const getAdditionalEventMember = async (req, res) => {
     try {
-        const { number, limit, page, search = '' } = req.query;
+        let { number, limit, page, search = '' } = req.query;
 
         limit = parseInt(limit) || 10;
         page = parseInt(page) || 1;
