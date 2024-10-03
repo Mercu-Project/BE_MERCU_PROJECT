@@ -613,6 +613,7 @@ const getEventMember = async (req, res) => {
 
         const offset = (page - 1) * limit;
 
+        // Get preorder by number
         const [preorder] = await db.execute(
             `SELECT id FROM canteen_preorders WHERE number = ?`,
             [number]
@@ -622,13 +623,7 @@ const getEventMember = async (req, res) => {
             return httpResponse(res, 404, 'Data not found');
         }
 
-        let query = `
-            SELECT 
-                u.full_name AS fullName,
-                a.username,
-                COALESCE(u.unit, '') AS unit,
-                COALESCE(u.jobPosition, '') AS jobPosition,
-                COALESCE(u.category, '') AS category
+        let baseQuery = `
             FROM event_members em
             LEFT JOIN accounts a ON em.member_name = a.username
             LEFT JOIN users u ON a.id = u.account_id
@@ -636,18 +631,41 @@ const getEventMember = async (req, res) => {
             AND em.is_additional = 0
         `;
 
-        if (search !== '') query += ` AND LOWER(u.full_name) LIKE ?`;
-        if (unit) query += ` AND u.unit = ?`;
-
-        query += ` ORDER BY em.id ASC LIMIT ${limit} OFFSET ${offset}`;
+        let countQuery = `SELECT COUNT(*) AS total ${baseQuery}`;
+        let dataQuery = `
+            SELECT 
+                u.full_name AS fullName,
+                a.username,
+                COALESCE(u.unit, '') AS unit,
+                COALESCE(u.jobPosition, '') AS jobPosition,
+                COALESCE(u.category, '') AS category
+            ${baseQuery}
+            ORDER BY em.id ASC
+            LIMIT ${limit} OFFSET ${offset}
+        `;
 
         const params = [preorder[0].id];
-        if (search !== '') params.push(`%${search.toLowerCase()}%`);
-        if (unit) params.push(unit);
 
-        const [rows] = await db.execute(query, params);
+        // Add filters for search and unit if provided
+        if (search !== '') {
+            baseQuery += ` AND LOWER(u.full_name) LIKE ?`;
+            params.push(`%${search.toLowerCase()}%`);
+        }
 
-        const pagination = buildPaginationData(limit, page, rows.length);
+        if (unit) {
+            baseQuery += ` AND u.unit = ?`;
+            params.push(unit);
+        }
+
+        // Execute the count query to get total records
+        const [countRows] = await db.execute(countQuery, params);
+        const totalData = countRows[0].total;
+
+        // Execute the data query with pagination
+        const [rows] = await db.execute(dataQuery, params);
+
+        // Build pagination data
+        const pagination = buildPaginationData(limit, page, totalData);
 
         return httpResponse(
             res,
@@ -661,6 +679,55 @@ const getEventMember = async (req, res) => {
     }
 };
 
+// const getAdditionalEventMember = async (req, res) => {
+//     try {
+//         const { number, limit, page, search = '' } = req.query;
+
+//         limit = parseInt(limit) || 10;
+//         page = parseInt(page) || 1;
+
+//         const offset = (page - 1) * limit;
+
+//         const [preorder] = await db.execute(
+//             `SELECT id FROM canteen_preorders WHERE number = ?`,
+//             [number]
+//         );
+
+//         if (!preorder.length) {
+//             return httpResponse(res, 404, 'Data not found');
+//         }
+
+//         let query = `SELECT member_name AS memberName FROM event_members
+//             WHERE is_additional = 1
+//             AND preorder_id = ?
+//         `;
+
+//         const params = [preorder[0].id];
+
+//         if (search !== '') {
+//             query += ` AND LOWER(member_name) LIKE ? `;
+//             params.push(`%${search.toLowerCase()}%`);
+//         }
+
+//         query += `LIMIT ${limit} OFFSET ${offset}
+//             ORDER BY id ASC`;
+
+//         const [rows] = await db.execute(query, params);
+
+//         const pagination = buildPaginationData(limit, page, rows.length);
+
+//         return httpResponse(
+//             res,
+//             httpStatus.OK,
+//             'get additional member name',
+//             rows,
+//             pagination
+//         );
+//     } catch (error) {
+//         return serverErrorResponse(res, error);
+//     }
+// };
+
 const getAdditionalEventMember = async (req, res) => {
     try {
         const { number, limit, page, search = '' } = req.query;
@@ -670,6 +737,7 @@ const getAdditionalEventMember = async (req, res) => {
 
         const offset = (page - 1) * limit;
 
+        // Get preorder by number
         const [preorder] = await db.execute(
             `SELECT id FROM canteen_preorders WHERE number = ?`,
             [number]
@@ -679,24 +747,37 @@ const getAdditionalEventMember = async (req, res) => {
             return httpResponse(res, 404, 'Data not found');
         }
 
-        let query = `SELECT member_name AS memberName FROM event_members
+        let baseQuery = `
+            FROM event_members 
             WHERE is_additional = 1 
             AND preorder_id = ?
         `;
 
+        let countQuery = `SELECT COUNT(*) AS total ${baseQuery}`;
+        let dataQuery = `
+            SELECT member_name AS memberName
+            ${baseQuery}
+            ORDER BY id ASC
+            LIMIT ${limit} OFFSET ${offset}
+        `;
+
         const params = [preorder[0].id];
 
+        // Add search filter if provided
         if (search !== '') {
-            query += ` AND LOWER(member_name) LIKE ? `;
+            baseQuery += ` AND LOWER(member_name) LIKE ?`;
             params.push(`%${search.toLowerCase()}%`);
         }
 
-        query += `LIMIT ${limit} OFFSET ${offset}
-            ORDER BY id ASC`;
+        // Execute the count query to get total records
+        const [countRows] = await db.execute(countQuery, params);
+        const totalData = countRows[0].total;
 
-        const [rows] = await db.execute(query, params);
+        // Execute the data query with pagination
+        const [rows] = await db.execute(dataQuery, params);
 
-        const pagination = buildPaginationData(limit, page, rows.length);
+        // Build pagination data
+        const pagination = buildPaginationData(limit, page, totalData);
 
         return httpResponse(
             res,
