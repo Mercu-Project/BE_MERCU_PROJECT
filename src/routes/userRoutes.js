@@ -9,7 +9,7 @@ router.post('/register-user', auth, checkRole(ROLES.BAK), User.registerUser);
 router.get(
     '/get-users',
     auth,
-    checkRole([ROLES.ADMIN, ROLES.BAK]),
+    checkRole([ROLES.ADMIN, ROLES.BAK, ROLES.TU]),
     User.getUsers
 );
 router.patch(
