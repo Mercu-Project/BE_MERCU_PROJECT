@@ -21,10 +21,16 @@ const {
 const submitPreorder = async (req, res) => {
     let connection;
     try {
-        let { eventDate, preorderTypes } = req.body;
+        let {
+            eventDate,
+            preorderTypes,
+            eventName,
+            eventMembers,
+            additionalEventMember,
+        } = req.body;
         // const attachmentPath = req.file ? req.file.path : null; // Save the file path if a file is uploaded
-        const attachmentPath = null; // Save the file path if a file is uploaded
-
+        const attachmentPath = null;
+        // Save the file path if a file is uploaded
         // Parse preorderTypes from JSON string if necessary
         // if (typeof preorderTypes === 'string') {
         //     preorderTypes = JSON.parse(preorderTypes);
@@ -75,7 +81,7 @@ const submitPreorder = async (req, res) => {
         ]);
 
         const [newPreorder] = await connection.execute(
-            'INSERT INTO canteen_preorders (requester_id, event_date, request_count, status, number, faculty_id, attachment_path) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO canteen_preorders (requester_id, event_date, request_count, status, number, faculty_id, event_name) VALUES (?, ?, ?, ?, ?, ?, ?)',
             [
                 req.user.id,
                 eventDate,
@@ -83,7 +89,7 @@ const submitPreorder = async (req, res) => {
                 pendingStatus,
                 nomorPengajuan,
                 req.user.facultyId,
-                attachmentPath,
+                eventName,
             ]
         );
 
@@ -94,6 +100,7 @@ const submitPreorder = async (req, res) => {
 
         const preorderId = newPreorder.insertId;
 
+        /* Insert preorder types */
         for (const preOrderType of preorderTypes) {
             const [newPreorderType] = await connection.execute(
                 'INSERT INTO canteen_preorder_detail (order_type, qty, preorder_id) VALUES (?, ?, ?)',
@@ -103,6 +110,36 @@ const submitPreorder = async (req, res) => {
             if (newPreorderType.affectedRows === 0) {
                 await connection.rollback();
                 throw new Error('failed executin query insert preorder detail');
+            }
+        }
+
+        /* Insert event members */
+        for (const eventMember of eventMembers) {
+            const [insertEventMember] = await connection.execute(
+                `INSERT INTO event_members (member_name, is_additional, preorder_id)
+                VALUES (?, ?, ?)`,
+                [eventMember.username, false, preorderId]
+            );
+
+            if (insertEventMember.affectedRows === 0) {
+                await connection.rollback();
+                throw new Error('Failed executing insert new event member');
+            }
+        }
+
+        /*  Insert Additional Event Member if exist */
+        for (const additional of additionalEventMember) {
+            const [insertEventMember] = await connection.execute(
+                `INSERT INTO event_members (member_name, is_additional, preorder_id)
+                VALUES (?, ?, ?)`,
+                [additional.fullName, true, preorderId]
+            );
+
+            if (insertEventMember.affectedRows === 0) {
+                await connection.rollback();
+                throw new Error(
+                    'Failed executing insert new additional event member'
+                );
             }
         }
 
