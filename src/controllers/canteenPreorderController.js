@@ -606,7 +606,7 @@ const getPreorderDetail = async (req, res) => {
 
 const getEventMember = async (req, res) => {
     try {
-        let { number, limit, page, search = '', unit } = req.query;
+        let { number, limit, page, search = '', unit = '' } = req.query;
 
         limit = parseInt(limit) || 10;
         page = parseInt(page) || 1;
@@ -652,9 +652,9 @@ const getEventMember = async (req, res) => {
             params.push(`%${search.toLowerCase()}%`);
         }
 
-        if (unit) {
-            baseQuery += ` AND u.unit = ?`;
-            params.push(unit);
+        if (unit !== '') {
+            baseQuery += ` AND UPPER(u.unit) = ?`;
+            params.push(unit.toUpperCase());
         }
 
         // Execute the count query to get total records
