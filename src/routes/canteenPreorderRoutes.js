@@ -37,4 +37,11 @@ router.patch(
 router.get('/get-status-history/:id', auth, CanteenPreorder.getStatusHistory);
 router.get('/get-preorder-detail/:id', auth, CanteenPreorder.getPreorderDetail);
 
+router.get('/get-event-member', auth, CanteenPreorder.getEventMember);
+router.get(
+    '/get-additional-event-member',
+    auth,
+    CanteenPreorder.getAdditionalEventMember
+);
+
 module.exports = router;

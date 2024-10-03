@@ -398,6 +398,7 @@ const getPreorders = async (req, res) => {
             `SELECT 
                 cpo.id,
                 CONVERT_TZ(cpo.event_date, '+00:00', 'Asia/Jakarta') AS event_date,
+                cpo.event_name AS eventName,
                 cpo.request_count,
                 cpo.status,
                 cpo.number,
@@ -603,6 +604,112 @@ const getPreorderDetail = async (req, res) => {
     }
 };
 
+const getEventMember = async (req, res) => {
+    try {
+        let { number, limit, page, search = '', unit } = req.query;
+
+        limit = parseInt(limit) || 10;
+        page = parseInt(page) || 1;
+
+        const offset = (page - 1) * limit;
+
+        const [preorder] = await db.execute(
+            `SELECT id FROM canteen_preorders WHERE number = ?`,
+            [number]
+        );
+
+        if (!preorder.length) {
+            return httpResponse(res, 404, 'Data not found');
+        }
+
+        let query = `
+            SELECT 
+                u.full_name AS fullName,
+                a.username,
+                COALESCE(u.unit, '') AS unit,
+                COALESCE(u.jobPosition, '') AS jobPosition,
+                COALESCE(u.category, '') AS category
+            FROM event_members em
+            LEFT JOIN accounts a ON em.member_name = a.username
+            LEFT JOIN users u ON a.id = u.account_id
+            WHERE em.preorder_id = ?
+            AND em.is_additional = 0
+        `;
+
+        if (search !== '') query += ` AND LOWER(u.full_name) LIKE ?`;
+        if (unit) query += ` AND u.unit = ?`;
+
+        query += ` ORDER BY em.id ASC LIMIT ${limit} OFFSET ${offset}`;
+
+        const params = [preorder[0].id];
+        if (search !== '') params.push(`%${search.toLowerCase()}%`);
+        if (unit) params.push(unit);
+
+        const [rows] = await db.execute(query, params);
+
+        const pagination = buildPaginationData(limit, page, rows.length);
+
+        return httpResponse(
+            res,
+            httpStatus.OK,
+            'get member name',
+            rows,
+            pagination
+        );
+    } catch (error) {
+        return serverErrorResponse(res, error);
+    }
+};
+
+const getAdditionalEventMember = async (req, res) => {
+    try {
+        const { number, limit, page, search = '' } = req.query;
+
+        limit = parseInt(limit) || 10;
+        page = parseInt(page) || 1;
+
+        const offset = (page - 1) * limit;
+
+        const [preorder] = await db.execute(
+            `SELECT id FROM canteen_preorders WHERE number = ?`,
+            [number]
+        );
+
+        if (!preorder.length) {
+            return httpResponse(res, 404, 'Data not found');
+        }
+
+        let query = `SELECT member_name AS memberName FROM event_members
+            WHERE is_additional = 1 
+            AND preorder_id = ?
+        `;
+
+        const params = [preorder[0].id];
+
+        if (search !== '') {
+            query += ` AND LOWER(member_name) LIKE ? `;
+            params.push(`%${search.toLowerCase()}%`);
+        }
+
+        query += `LIMIT ${limit} OFFSET ${offset}
+            ORDER BY id ASC`;
+
+        const [rows] = await db.execute(query, params);
+
+        const pagination = buildPaginationData(limit, page, rows.length);
+
+        return httpResponse(
+            res,
+            httpStatus.OK,
+            'get additional member name',
+            rows,
+            pagination
+        );
+    } catch (error) {
+        return serverErrorResponse(res, error);
+    }
+};
+
 module.exports = {
     submitPreorder,
     approvalPreorder,
@@ -610,4 +717,6 @@ module.exports = {
     editPreorder,
     getStatusHistory,
     getPreorderDetail,
+    getEventMember,
+    getAdditionalEventMember,
 };
