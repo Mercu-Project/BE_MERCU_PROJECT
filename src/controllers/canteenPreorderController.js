@@ -606,7 +606,7 @@ const getPreorderDetail = async (req, res) => {
 
 const getEventMember = async (req, res) => {
     try {
-        let { number, limit, page, search = '', unit = '' } = req.query;
+        let { number, limit, page, search, unit } = req.query;
 
         limit = parseInt(limit) || 10;
         page = parseInt(page) || 1;
@@ -631,6 +631,19 @@ const getEventMember = async (req, res) => {
             AND em.is_additional = 0
         `;
 
+        const params = [preorder[0].id];
+
+        // Add filters for search and unit if provided
+        if (search) {
+            baseQuery += ` AND LOWER(u.full_name) LIKE ?`;
+            params.push(`%${search.toLowerCase()}%`);
+        }
+
+        if (unit) {
+            baseQuery += ` AND UPPER(u.unit) = ?`;
+            params.push(unit.toUpperCase());
+        }
+
         let countQuery = `SELECT COUNT(*) AS total ${baseQuery}`;
         let dataQuery = `
             SELECT 
@@ -643,19 +656,6 @@ const getEventMember = async (req, res) => {
             ORDER BY em.id ASC
             LIMIT ${limit} OFFSET ${offset}
         `;
-
-        const params = [preorder[0].id];
-
-        // Add filters for search and unit if provided
-        if (search !== '') {
-            baseQuery += ` AND LOWER(u.full_name) LIKE ?`;
-            params.push(`%${search.toLowerCase()}%`);
-        }
-
-        if (unit !== '') {
-            baseQuery += ` AND UPPER(u.unit) = ?`;
-            params.push(unit.toUpperCase());
-        }
 
         // Execute the count query to get total records
         const [countRows] = await db.execute(countQuery, params);
@@ -679,58 +679,9 @@ const getEventMember = async (req, res) => {
     }
 };
 
-// const getAdditionalEventMember = async (req, res) => {
-//     try {
-//         const { number, limit, page, search = '' } = req.query;
-
-//         limit = parseInt(limit) || 10;
-//         page = parseInt(page) || 1;
-
-//         const offset = (page - 1) * limit;
-
-//         const [preorder] = await db.execute(
-//             `SELECT id FROM canteen_preorders WHERE number = ?`,
-//             [number]
-//         );
-
-//         if (!preorder.length) {
-//             return httpResponse(res, 404, 'Data not found');
-//         }
-
-//         let query = `SELECT member_name AS memberName FROM event_members
-//             WHERE is_additional = 1
-//             AND preorder_id = ?
-//         `;
-
-//         const params = [preorder[0].id];
-
-//         if (search !== '') {
-//             query += ` AND LOWER(member_name) LIKE ? `;
-//             params.push(`%${search.toLowerCase()}%`);
-//         }
-
-//         query += `LIMIT ${limit} OFFSET ${offset}
-//             ORDER BY id ASC`;
-
-//         const [rows] = await db.execute(query, params);
-
-//         const pagination = buildPaginationData(limit, page, rows.length);
-
-//         return httpResponse(
-//             res,
-//             httpStatus.OK,
-//             'get additional member name',
-//             rows,
-//             pagination
-//         );
-//     } catch (error) {
-//         return serverErrorResponse(res, error);
-//     }
-// };
-
 const getAdditionalEventMember = async (req, res) => {
     try {
-        let { number, limit, page, search = '' } = req.query;
+        let { number, limit, page, search } = req.query;
 
         limit = parseInt(limit) || 10;
         page = parseInt(page) || 1;
@@ -753,6 +704,14 @@ const getAdditionalEventMember = async (req, res) => {
             AND preorder_id = ?
         `;
 
+        const params = [preorder[0].id];
+
+        // Add search filter if provided
+        if (search) {
+            baseQuery += ` AND LOWER(member_name) LIKE ?`;
+            params.push(`%${search.toLowerCase()}%`);
+        }
+
         let countQuery = `SELECT COUNT(*) AS total ${baseQuery}`;
         let dataQuery = `
             SELECT member_name AS memberName
@@ -761,17 +720,11 @@ const getAdditionalEventMember = async (req, res) => {
             LIMIT ${limit} OFFSET ${offset}
         `;
 
-        const params = [preorder[0].id];
-
-        // Add search filter if provided
-        if (search !== '') {
-            baseQuery += ` AND LOWER(member_name) LIKE ?`;
-            params.push(`%${search.toLowerCase()}%`);
-        }
-
         // Execute the count query to get total records
         const [countRows] = await db.execute(countQuery, params);
         const totalData = countRows[0].total;
+
+        console.log(dataQuery);
 
         // Execute the data query with pagination
         const [rows] = await db.execute(dataQuery, params);
