@@ -11,7 +11,7 @@ const { ERR_MSG } = require('../utils/constants');
 
 const getUsers = async (req, res) => {
     try {
-        let { limit, page, search = '' } = req.query;
+        let { limit, page, search = '', number } = req.query;
 
         const { perPage, currentPage } = parseOrUseDefault(limit, page);
         const offset = getOffset(perPage, currentPage);
@@ -42,8 +42,28 @@ const getUsers = async (req, res) => {
             ${whereClause}
         `;
 
-        const orderQuery = `ORDER BY u.id DESC
-                            LIMIT ${perPage} OFFSET ${offset}`;
+        let orderQuery = ``;
+
+        if (number) {
+            const [preorder] = await db.execute(
+                `SELECT id FROM canteen_preorders WHERE number  = ?`,
+                [number]
+            );
+            orderQuery = ` ORDER BY 
+                CASE WHEN u.id IN (
+                    SELECT u.id
+                    FROM event_members em
+                    LEFT JOIN users u ON u.account_id = (
+                        SELECT a.id FROM accounts a WHERE a.username = em.member_name AND em.is_additional = 0
+                    )
+                    WHERE em.preorder_id = ?
+                ) THEN 1 ELSE 2 END 
+                LIMIT ${perPage} OFFSET ${offset} `;
+            queryParams.push(preorder[0].id);
+        } else {
+            orderQuery = ` ORDER BY u.id DESC
+                               LIMIT ${perPage} OFFSET ${offset} `;
+        }
 
         const totalQuery = `
                 SELECT 
