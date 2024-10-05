@@ -24,4 +24,14 @@ const getOffset = (limit, page) => {
     return (page - 1) * limit;
 };
 
-module.exports = { buildPaginationData, parseOrUseDefault, getOffset };
+const resetCurrentPageIfSearch = (search, currentPage) => {
+    if (!search) return currentPage;
+    else return 1;
+};
+
+module.exports = {
+    buildPaginationData,
+    parseOrUseDefault,
+    getOffset,
+    resetCurrentPageIfSearch,
+};

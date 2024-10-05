@@ -11,7 +11,12 @@ const {
     isContains,
 } = require('../utils/compareUtil');
 const { replacePlaceholders } = require('../utils/stringUtil');
-const { buildPaginationData } = require('../utils/pagination');
+const {
+    buildPaginationData,
+    parseOrUseDefault,
+    getOffset,
+    resetCurrentPageIfSearch,
+} = require('../utils/pagination');
 const {
     convertToJakartaTime,
     getCurrentTime,
@@ -440,7 +445,13 @@ const editPreorder = async (req, res) => {
     let connection;
     try {
         const { id } = req.params;
-        let { eventDate, preorderTypes } = req.body;
+        let {
+            eventDate,
+            preorderTypes,
+            eventName,
+            eventMembers,
+            additionalEventMember,
+        } = req.body;
 
         eventDate = convertToJakartaTime(eventDate);
 
@@ -480,8 +491,8 @@ const editPreorder = async (req, res) => {
             ROLES.DEKAN,
         ]);
         const [updatePreorder] = await connection.execute(
-            `UPDATE canteen_preorders SET event_date = ?, status = ?, request_count = request_count + 1, reject_reason = NULL WHERE id = ?`,
-            [eventDate, pendingStatus, id]
+            `UPDATE canteen_preorders SET event_date = ?, status = ?, request_count = request_count + 1, event_name = ? reject_reason = NULL WHERE id = ?`,
+            [eventDate, pendingStatus, eventName, id]
         );
 
         const changedAt = getCurrentTime();
@@ -522,6 +533,47 @@ const editPreorder = async (req, res) => {
             if (insertNewPreorderType.affectedRows === 0) {
                 await connection.rollback();
                 throw new Error('failed executing insert new preorder type');
+            }
+        }
+
+        /* Deleting Event Members */
+        const [deleteEventMembers] = await connection.execute(
+            `DELETE FROM event_members WHERE preorder_id = ?`,
+            [id]
+        );
+
+        if (deleteEventMembers.affectedRows === 0) {
+            await connection.rollback();
+            throw new Error('failed deleting event members');
+        }
+
+        /* Looping Event members non additional */
+        for (const eventMember of eventMembers) {
+            const [insertEventMember] = await connection.execute(
+                `INSERT INTO event_members (member_name, is_additional, preorder_id)
+                VALUES (?, ?, ?)`,
+                [eventMember.username, false, preorderId]
+            );
+
+            if (insertEventMember.affectedRows === 0) {
+                await connection.rollback();
+                throw new Error('Failed executing insert new event member');
+            }
+        }
+
+        /*  Insert Additional Event Member if exist */
+        for (const additional of additionalEventMember) {
+            const [insertEventMember] = await connection.execute(
+                `INSERT INTO event_members (member_name, is_additional, preorder_id)
+                VALUES (?, ?, ?)`,
+                [additional.fullName, true, preorderId]
+            );
+
+            if (insertEventMember.affectedRows === 0) {
+                await connection.rollback();
+                throw new Error(
+                    'Failed executing insert new additional event member'
+                );
             }
         }
 
@@ -744,6 +796,112 @@ const getAdditionalEventMember = async (req, res) => {
     }
 };
 
+const getPreorderEditData = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const [preorderRows] = await db.execute(
+            `SELECT 
+                cpd.id AS detail_id,
+                cpd.preorder_id,
+                cpd.order_type,
+                cpd.qty,
+                cpd.created_at AS detail_created_at,
+                cpd.updated_at AS detail_updated_at,
+                cp.requester_id,
+                cp.event_date AS eventDate,
+                cp.request_count,
+                cp.status,
+                cp.created_at AS preorder_created_at,
+                cp.updated_at AS preorder_updated_at,
+                cp.number,
+                cp.faculty_id,
+                cp.reject_reason,
+                cp.attachment_path,
+                cp.event_name AS eventName
+            FROM 
+                canteen_preorder_detail cpd
+            JOIN 
+                canteen_preorders cp ON cpd.preorder_id = cp.id
+            WHERE 
+                cpd.preorder_id = ?`,
+            [id]
+        );
+
+        if (!preorderRows || preorderRows.length === 0) {
+            return httpResponse(
+                res,
+                httpStatus.NOT_FOUND,
+                'Preorder not found'
+            );
+        }
+
+        // Map the preorder data
+        const preorder = {
+            id: preorderRows[0].preorder_id,
+            requester_id: preorderRows[0].requester_id,
+            event_date: preorderRows[0].event_date,
+            request_count: preorderRows[0].request_count,
+            status: preorderRows[0].status,
+            created_at: preorderRows[0].preorder_created_at,
+            updated_at: preorderRows[0].preorder_updated_at,
+            number: preorderRows[0].number,
+            faculty_id: preorderRows[0].faculty_id,
+            reject_reason: preorderRows[0].reject_reason,
+            attachment_path: preorderRows[0].attachment_path,
+            event_name: preorderRows[0].event_name,
+            preorderTypes: preorderRows.map((row) => ({
+                id: row.detail_id,
+                orderType: row.order_type,
+                qty: row.qty,
+                created_at: row.detail_created_at,
+                updated_at: row.detail_updated_at,
+            })),
+        };
+
+        const [eventMembers] = await db.execute(
+            `SELECT 
+                u.full_name AS fullName,
+                a.username,
+                COALESCE(u.unit, '') AS unit,
+                COALESCE(u.jobPosition, '') AS jobPosition,
+                COALESCE(u.category, '') AS category
+             FROM event_members em
+                LEFT JOIN accounts a ON em.member_name = a.username
+                LEFT JOIN users u ON a.id = u.account_id
+                WHERE em.preorder_id = ?
+                AND em.is_additional = 0
+                ORDER BY em.id ASC
+            `,
+            [id]
+        );
+
+        const [additionalMember] = await db.execute(
+            `
+                SELECT member_name AS fullName
+                FROM event_members WHERE is_additional = 1
+                AND preorder_id = ? ORDER BY id ASC
+            `,
+            [id]
+        );
+
+        const response = {
+            preorder,
+            eventMembers,
+            additionalMember,
+        };
+
+        return httpResponse(
+            res,
+            httpStatus.OK,
+            'get preorder edit data',
+            response
+        );
+    } catch (error) {
+        return serverErrorResponse(res, error);
+    }
+};
+
 module.exports = {
     submitPreorder,
     approvalPreorder,
@@ -753,4 +911,5 @@ module.exports = {
     getPreorderDetail,
     getEventMember,
     getAdditionalEventMember,
+    getPreorderEditData,
 };

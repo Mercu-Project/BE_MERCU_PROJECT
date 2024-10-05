@@ -43,5 +43,10 @@ router.get(
     auth,
     CanteenPreorder.getAdditionalEventMember
 );
+router.get(
+    '/get-preorder-edit-data/:id',
+    auth,
+    CanteenPreorder.getPreorderEditData
+);
 
 module.exports = router;

@@ -71,6 +71,9 @@ CREATE TABLE "canteen_preorders" (
   "updated_at" timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   "number" varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   "faculty_id" int DEFAULT NULL,
+  "reject_reason" text COLLATE utf8mb4_unicode_ci,
+  "attachment_path" varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "event_name" varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY ("id"),
   KEY "requester_id" ("requester_id"),
   KEY "faculty_id" ("faculty_id"),
@@ -84,9 +87,22 @@ CREATE TABLE "canteen_scans" (
   "scanned_at" time DEFAULT NULL,
   "created_at" timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   "updated_at" timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  "sequence" int NOT NULL,
   PRIMARY KEY ("id"),
   KEY "account_id" ("account_id"),
   CONSTRAINT "canteen_scans_ibfk_1" FOREIGN KEY ("account_id") REFERENCES "accounts" ("id") ON DELETE CASCADE
+);
+
+CREATE TABLE "event_members" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "member_name" varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "is_additional" tinyint(1) DEFAULT '0',
+  "created_at" timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  "preorder_id" int DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "preorder_id" ("preorder_id"),
+  CONSTRAINT "event_members_ibfk_1" FOREIGN KEY ("preorder_id") REFERENCES "canteen_preorders" ("id") ON DELETE SET NULL
 );
 
 CREATE TABLE "faculties" (
@@ -123,6 +139,9 @@ CREATE TABLE "users" (
   "account_id" int NOT NULL,
   "created_at" timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   "updated_at" timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  "unit" varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "category" varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "jobPosition" varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY ("id"),
   KEY "account_id" ("account_id"),
   CONSTRAINT "users_ibfk_1" FOREIGN KEY ("account_id") REFERENCES "accounts" ("id") ON DELETE CASCADE
@@ -152,7 +171,22 @@ INSERT INTO `accounts` (`id`, `username`, `password`, `role_id`, `created_at`, `
 (19, '41521010037', '$2a$12$Mu069kRQLiieQJTf2/Nxj.qmBR86eEyaKsB4f4ge.1.TZiRqipFMi', 2, '2024-08-02 03:51:08', '2024-09-01 09:17:37', 1),
 (20, '12345', '$2a$12$sQ/Zy6oUqTHWcbmaNfiSYeBtXABPHl2O5CR1LIsyH5N1K8qMxP2Oe', 2, '2024-08-13 04:15:45', '2024-09-01 09:17:37', 1),
 (21, 'tu1', '$2a$12$XI3Gmk.BPdYW7PXiFqflPe7F5ifBYKAInqSkPcSsFhwHhw76kBP4a', 5, '2024-09-01 11:53:32', '2024-09-01 11:53:32', 1),
-(22, 'dekan1', '$2a$12$8xi/ffNbGajNxUg4TgpSOu8gg9N0.QwKhHBrbxRsudcgls86I41.6', 3, '2024-09-01 14:33:12', '2024-09-01 14:33:12', 1);
+(22, 'dekan1', '$2a$12$8xi/ffNbGajNxUg4TgpSOu8gg9N0.QwKhHBrbxRsudcgls86I41.6', 3, '2024-09-01 14:33:12', '2024-09-01 14:33:12', 1),
+(23, 'sdm1', '$2a$12$/khnFizGk/z9sM9vovlGc.jFvwfThQmnOuYfXz2jXoqQaEvnd1.OW', 4, '2024-09-05 21:46:05', '2024-09-16 08:27:25', 1),
+(24, '320950413', '$2a$12$lEfGOc4dqWDNPeWg0LyNI.KBv/96Nmo0qr5Run.YinELyPFaHSKP.', 2, '2024-09-09 03:49:31', '2024-09-09 03:49:31', NULL),
+(25, '312', '$2a$12$laYKtWk5QbOCr38RHH.bv.BBMBkanCHEWNdPrrX6GwNNW7uJGY9l.', 2, '2024-09-09 03:53:49', '2024-09-09 03:53:49', NULL),
+(26, '777999', '$2a$12$CZhTzvJyNPvFQoscabp8Pe.r5TqRSx.0r3MRPeyM.LxHAxnu9lLvi', 2, '2024-09-09 16:44:58', '2024-09-09 16:44:58', NULL),
+(27, '1994', '$2a$12$uzjB2zUsWZvNTbT.9f.vTOl2ffKlnRA/6WcY74lTr87wDb/jHK/Yu', 2, '2024-09-11 07:58:42', '2024-09-11 07:58:42', NULL),
+(28, '123123', '$2a$12$zgx4QNy0lF3iXWtXDqAHbeIf992wawIhHolKjexwuMFNVGMvWw.iy', 2, '2024-09-11 08:00:02', '2024-09-11 08:00:02', NULL),
+(29, '001', '$2a$12$PINspekVtkwKrQZvxz3SlO4EjWS/3A2kYhzorIit.O6c.dDRx/EMa', 2, '2024-09-13 15:12:11', '2024-09-13 15:12:11', NULL),
+(30, '002', '$2a$12$bqBQ8LLjfEJJ8Mcouhvg6uVIpF.8TOXeHTvfi0GgLBmZ7PskVGPkS', 2, '2024-09-13 15:28:18', '2024-09-16 12:22:42', NULL),
+(31, '003', '$2a$12$k.f.LMQawNvXVBog.rJn3u/lJhF3QiK34oZprKFS2qSrGK9C2Ykbq', 2, '2024-09-13 15:54:53', '2024-09-13 15:54:53', NULL),
+(32, '004', '$2a$12$SVAuJ02KrTQOHw4X/1H.dO4yLDZJ0SmafpdeA5LZiGJNEJuUhxCBi', 2, '2024-09-16 10:29:14', '2024-09-16 10:29:14', NULL),
+(33, '10000', '$2a$12$KSxpYpdHSFUOgc3fmpuC/OjZ8TsSuQyDGD1o.CfuR9mbdpQ9UTso6', 2, '2024-09-18 07:20:21', '2024-09-18 07:20:21', NULL),
+(34, '20000', '$2a$12$Uayoqn5jjkMHPqU.Io1ao.y5emHU2QLzIVmOJFh58xyuBIAjRewb.', 2, '2024-09-19 01:23:13', '2024-09-19 01:23:13', NULL),
+(35, '30000', '$2a$12$RGf/yHgPyWhTPuS.87CB2.aCWt2VeUVQHmhdkI/U4qTKQXMeaabpe', 2, '2024-09-20 08:24:25', '2024-09-20 08:24:25', NULL),
+(36, '393700115', '$2a$12$22gWaV6UM16s.kwiTNAP5O2gPUUouUj4Z4.GrzkAa3H9TVFVuZhlq', 2, '2024-09-20 08:46:51', '2024-09-20 08:46:51', NULL),
+(37, '8000', '$2a$12$C2.gPv131fxjvtGG0HdM3.NrsL2CIhFi7zsptR0iItEYZYsCAPSnu', 2, '2024-09-24 15:27:32', '2024-09-24 15:27:32', NULL);
 
 INSERT INTO `admins` (`id`, `full_name`, `account_id`, `created_at`, `updated_at`) VALUES
 (1, 'Admin 1', 2, '2024-07-17 13:08:54', '2024-07-17 13:08:54');
@@ -160,52 +194,165 @@ INSERT INTO `admins` (`id`, `full_name`, `account_id`, `created_at`, `updated_at
 (2, 'TU 1', 21, '2024-09-01 11:53:32', '2024-09-01 11:53:32');
 INSERT INTO `admins` (`id`, `full_name`, `account_id`, `created_at`, `updated_at`) VALUES
 (3, 'Dekan 1', 22, '2024-09-01 14:33:12', '2024-09-01 14:33:12');
+INSERT INTO `admins` (`id`, `full_name`, `account_id`, `created_at`, `updated_at`) VALUES
+(4, 'SDM 1', 23, '2024-09-05 21:46:05', '2024-09-16 13:38:39');
 
 INSERT INTO `canteen_preorder_detail` (`id`, `preorder_id`, `order_type`, `qty`, `created_at`, `updated_at`) VALUES
-(1, 2, 'Snack Basic', 120, '2024-09-01 12:42:02', '2024-09-01 12:42:02');
+(105, 22, 'Snack Basic', 30, '2024-09-06 12:56:24', '2024-09-06 12:56:24');
 INSERT INTO `canteen_preorder_detail` (`id`, `preorder_id`, `order_type`, `qty`, `created_at`, `updated_at`) VALUES
-(2, 3, 'Snack Premium', 112, '2024-09-01 12:44:16', '2024-09-01 12:44:16');
+(106, 22, 'Lunch Basic', 30, '2024-09-06 12:56:24', '2024-09-06 12:56:24');
 INSERT INTO `canteen_preorder_detail` (`id`, `preorder_id`, `order_type`, `qty`, `created_at`, `updated_at`) VALUES
-(3, 3, 'Snack Medium', 129, '2024-09-01 12:44:16', '2024-09-01 12:44:16');
+(108, 23, 'Snack Basic', 10, '2024-09-06 16:02:46', '2024-09-06 16:02:46');
 INSERT INTO `canteen_preorder_detail` (`id`, `preorder_id`, `order_type`, `qty`, `created_at`, `updated_at`) VALUES
-(4, 3, 'Lunch Basic', 118, '2024-09-01 12:44:16', '2024-09-01 12:44:16');
+(110, 24, 'Snack Medium', 10, '2024-09-08 15:14:08', '2024-09-08 15:14:08'),
+(113, 25, 'Snack Basic', 70, '2024-09-09 04:23:16', '2024-09-09 04:23:16'),
+(114, 26, 'Snack Basic', 30, '2024-09-09 14:46:51', '2024-09-09 14:46:51'),
+(115, 27, 'Snack Premium', 35, '2024-10-03 13:25:59', '2024-10-03 13:25:59'),
+(116, 27, 'Lunch Basic', 40, '2024-10-03 13:25:59', '2024-10-03 13:25:59');
 
 INSERT INTO `canteen_preorder_status_history` (`id`, `preorder_id`, `status`, `changed_at`, `created_at`, `updated_at`, `reject_reason`, `approver_id`) VALUES
-(1, 2, 'Disetujui oleh Dekan', '2024-09-01 14:36:16', '2024-09-01 14:36:16', '2024-09-01 14:36:16', NULL, 22);
+(59, 22, 'Ditolak oleh Dekan', '2024-09-06 19:54:12', '2024-09-06 12:54:13', '2024-09-06 12:54:13', 'snack premium nya tambah 5 lagi', 22);
+INSERT INTO `canteen_preorder_status_history` (`id`, `preorder_id`, `status`, `changed_at`, `created_at`, `updated_at`, `reject_reason`, `approver_id`) VALUES
+(60, 22, 'Menunggu Persetujuan Dekan', '2024-09-06 19:54:54', '2024-09-06 12:54:56', '2024-09-06 12:54:56', NULL, 21);
+INSERT INTO `canteen_preorder_status_history` (`id`, `preorder_id`, `status`, `changed_at`, `created_at`, `updated_at`, `reject_reason`, `approver_id`) VALUES
+(61, 22, 'Disetujui oleh Dekan', '2024-09-06 19:55:26', '2024-09-06 12:55:28', '2024-09-06 12:55:28', NULL, 22);
+INSERT INTO `canteen_preorder_status_history` (`id`, `preorder_id`, `status`, `changed_at`, `created_at`, `updated_at`, `reject_reason`, `approver_id`) VALUES
+(62, 22, 'Menunggu Persetujuan BAK', '2024-09-06 19:55:26', '2024-09-06 12:55:28', '2024-09-06 12:55:28', NULL, 22),
+(63, 22, 'Ditolak oleh BAK', '2024-09-06 19:55:50', '2024-09-06 12:55:52', '2024-09-06 12:55:52', 'snack premium hapus saja', 23),
+(64, 22, 'Menunggu Persetujuan Dekan', '2024-09-06 19:56:23', '2024-09-06 12:56:24', '2024-09-06 12:56:24', NULL, 21),
+(65, 22, 'Disetujui oleh Dekan', '2024-09-06 20:00:06', '2024-09-06 13:00:07', '2024-09-06 13:00:07', NULL, 22),
+(66, 22, 'Menunggu Persetujuan BAK', '2024-09-06 20:00:06', '2024-09-06 13:00:07', '2024-09-06 13:00:07', NULL, 22),
+(67, 22, 'Disetujui oleh BAK', '2024-09-06 20:00:17', '2024-09-06 13:00:19', '2024-09-06 13:00:19', NULL, 23),
+(68, 22, 'Menunggu Proses Kantin', '2024-09-06 20:00:17', '2024-09-06 13:00:19', '2024-09-06 13:00:19', NULL, 23),
+(69, 23, 'Ditolak oleh Dekan', '2024-09-06 20:01:23', '2024-09-06 13:01:25', '2024-09-06 13:01:25', 'tolak aja', 22),
+(70, 23, 'Menunggu Persetujuan Dekan', '2024-09-06 23:02:44', '2024-09-06 16:02:46', '2024-09-06 16:02:46', NULL, 21),
+(71, 23, 'Ditolak oleh Dekan', '2024-09-08 22:07:16', '2024-09-08 15:07:16', '2024-09-08 15:07:16', 'tidak ada alasan', 22),
+(72, 24, 'Disetujui oleh Dekan', '2024-09-08 22:10:54', '2024-09-08 15:10:54', '2024-09-08 15:10:54', NULL, 22),
+(73, 24, 'Menunggu Persetujuan BAK', '2024-09-08 22:10:54', '2024-09-08 15:10:54', '2024-09-08 15:10:54', NULL, 22),
+(74, 24, 'Ditolak oleh BAK', '2024-09-08 22:11:11', '2024-09-08 15:11:12', '2024-09-08 15:11:12', 'tolak aja', 23),
+(75, 24, 'Menunggu Persetujuan Dekan', '2024-09-08 22:14:07', '2024-09-08 15:14:08', '2024-09-08 15:14:08', NULL, 21),
+(76, 24, 'Ditolak oleh Dekan', '2024-09-08 22:14:51', '2024-09-08 15:14:52', '2024-09-08 15:14:52', 'tolak lagi', 22),
+(77, 25, 'Ditolak oleh Dekan', '2024-09-09 11:17:50', '2024-09-09 04:18:35', '2024-09-09 04:18:35', 'kurangi jumlahmya', 22),
+(78, 25, 'Menunggu Persetujuan Dekan', '2024-09-09 11:19:28', '2024-09-09 04:20:13', '2024-09-09 04:20:13', NULL, 21),
+(79, 25, 'Disetujui oleh Dekan', '2024-09-09 11:19:47', '2024-09-09 04:20:33', '2024-09-09 04:20:33', NULL, 22),
+(80, 25, 'Menunggu Persetujuan BAK', '2024-09-09 11:19:47', '2024-09-09 04:20:33', '2024-09-09 04:20:33', NULL, 22),
+(81, 25, 'Ditolak oleh BAK', '2024-09-09 11:21:55', '2024-09-09 04:22:41', '2024-09-09 04:22:41', 'kurangi pesanan', 23),
+(82, 25, 'Menunggu Persetujuan Dekan', '2024-09-09 11:22:31', '2024-09-09 04:23:16', '2024-09-09 04:23:16', NULL, 21),
+(83, 25, 'Disetujui oleh Dekan', '2024-09-09 11:22:52', '2024-09-09 04:23:37', '2024-09-09 04:23:37', NULL, 22),
+(84, 25, 'Menunggu Persetujuan BAK', '2024-09-09 11:22:52', '2024-09-09 04:23:37', '2024-09-09 04:23:37', NULL, 22),
+(85, 25, 'Disetujui oleh BAK', '2024-09-09 11:23:13', '2024-09-09 04:23:58', '2024-09-09 04:23:58', NULL, 23),
+(86, 25, 'Menunggu Proses Kantin', '2024-09-09 11:23:13', '2024-09-09 04:23:59', '2024-09-09 04:23:59', NULL, 23);
 
+INSERT INTO `canteen_preorders` (`id`, `requester_id`, `event_date`, `request_count`, `status`, `created_at`, `updated_at`, `number`, `faculty_id`, `reject_reason`, `attachment_path`, `event_name`) VALUES
+(22, 21, '2024-09-13', 3, 'Menunggu Proses Kantin', '2024-09-06 12:51:49', '2024-09-06 13:00:19', 'PO.09.2024.0001', 1, NULL, NULL, '');
+INSERT INTO `canteen_preorders` (`id`, `requester_id`, `event_date`, `request_count`, `status`, `created_at`, `updated_at`, `number`, `faculty_id`, `reject_reason`, `attachment_path`, `event_name`) VALUES
+(23, 21, '2024-09-14', 2, 'Ditolak oleh Sistem', '2024-09-06 13:01:04', '2024-09-08 15:07:17', 'PO.09.2024.0002', 1, 'tidak ada alasan', NULL, '');
+INSERT INTO `canteen_preorders` (`id`, `requester_id`, `event_date`, `request_count`, `status`, `created_at`, `updated_at`, `number`, `faculty_id`, `reject_reason`, `attachment_path`, `event_name`) VALUES
+(24, 21, '2024-09-16', 2, 'Ditolak oleh Sistem', '2024-09-08 15:10:36', '2024-09-10 17:06:40', 'PO.09.2024.0003', 1, 'tolak lagi', NULL, '');
+INSERT INTO `canteen_preorders` (`id`, `requester_id`, `event_date`, `request_count`, `status`, `created_at`, `updated_at`, `number`, `faculty_id`, `reject_reason`, `attachment_path`, `event_name`) VALUES
+(25, 21, '2024-09-30', 3, 'Menunggu Proses Kantin', '2024-09-09 04:10:23', '2024-09-09 04:23:59', 'PO.09.2024.0004', 1, NULL, NULL, ''),
+(26, 21, '2024-09-16', 1, 'Menunggu Persetujuan Dekan', '2024-09-09 14:46:50', '2024-09-09 14:46:50', 'PO.09.2024.0005', 1, NULL, NULL, ''),
+(27, 21, '2024-10-10', 1, 'Menunggu Persetujuan Dekan', '2024-10-03 13:25:59', '2024-10-03 13:25:59', 'PO.10.2024.0001', 1, NULL, NULL, 'Makan besar mercu');
 
-INSERT INTO `canteen_preorders` (`id`, `requester_id`, `event_date`, `request_count`, `status`, `created_at`, `updated_at`, `number`, `faculty_id`) VALUES
-(2, 21, '2024-09-10', 1, 'Disetujui oleh Dekan', '2024-09-01 12:42:02', '2024-09-01 14:36:16', 'PO.09.2024.0002', 1);
-INSERT INTO `canteen_preorders` (`id`, `requester_id`, `event_date`, `request_count`, `status`, `created_at`, `updated_at`, `number`, `faculty_id`) VALUES
-(3, 21, '2024-09-10', 1, 'Menunggu Persetujuan', '2024-09-01 12:44:15', '2024-09-01 13:22:13', 'PO.09.2024.0003', 1);
+INSERT INTO `canteen_scans` (`id`, `account_id`, `scanned_at`, `created_at`, `updated_at`, `sequence`) VALUES
+(1, 3, '21:29:08', '2024-07-17 14:29:09', '2024-07-17 14:29:09', 0);
+INSERT INTO `canteen_scans` (`id`, `account_id`, `scanned_at`, `created_at`, `updated_at`, `sequence`) VALUES
+(2, 4, '21:49:21', '2024-07-17 14:49:22', '2024-07-17 14:49:22', 0);
+INSERT INTO `canteen_scans` (`id`, `account_id`, `scanned_at`, `created_at`, `updated_at`, `sequence`) VALUES
+(3, 5, '21:58:05', '2024-07-17 14:58:05', '2024-07-17 14:58:05', 0);
+INSERT INTO `canteen_scans` (`id`, `account_id`, `scanned_at`, `created_at`, `updated_at`, `sequence`) VALUES
+(4, 4, '11:30:36', '2024-07-18 04:30:36', '2024-07-18 04:30:36', 0),
+(5, 6, '14:27:58', '2024-07-18 07:31:21', '2024-07-18 07:31:21', 0),
+(6, 7, '14:35:00', '2024-07-18 07:38:23', '2024-07-18 07:38:23', 0),
+(7, 5, '20:11:56', '2024-07-18 13:11:58', '2024-07-18 13:11:58', 0),
+(8, 3, '20:12:17', '2024-07-18 13:12:19', '2024-07-18 13:12:19', 0),
+(9, 9, '20:16:01', '2024-07-18 13:16:03', '2024-07-18 13:16:03', 0),
+(10, 10, '20:16:11', '2024-07-18 13:16:12', '2024-07-18 13:16:12', 0),
+(11, 11, '21:51:27', '2024-07-18 14:51:28', '2024-07-18 14:51:28', 0),
+(12, 12, '21:57:36', '2024-07-18 14:57:37', '2024-07-18 14:57:37', 0),
+(13, 14, '23:39:31', '2024-07-18 16:39:34', '2024-07-18 16:39:34', 0),
+(14, 5, '20:41:28', '2024-07-19 13:41:30', '2024-07-19 13:41:30', 0),
+(15, 14, '22:53:12', '2024-07-22 15:53:14', '2024-07-22 15:53:14', 0),
+(16, 15, '14:07:10', '2024-07-23 07:07:15', '2024-07-23 07:07:15', 0),
+(17, 13, '20:46:55', '2024-07-23 13:46:57', '2024-07-23 13:46:57', 0),
+(18, 14, '22:58:44', '2024-07-24 15:58:47', '2024-07-24 15:58:47', 0),
+(19, 17, '20:08:16', '2024-08-01 13:08:19', '2024-08-01 13:08:19', 0),
+(20, 20, '11:17:56', '2024-08-13 04:17:58', '2024-08-13 04:17:58', 0),
+(21, 19, '11:34:49', '2024-08-13 04:34:49', '2024-08-13 04:34:49', 0),
+(22, 5, '11:35:15', '2024-08-13 04:35:16', '2024-08-13 04:35:16', 0),
+(23, 8, '10:57:16', '2024-09-09 03:58:01', '2024-09-09 03:58:01', 0),
+(24, 30, '17:59:14', '2024-09-14 10:59:15', '2024-09-14 10:59:15', 0),
+(25, 26, '18:00:50', '2024-09-14 11:00:51', '2024-09-14 11:00:51', 0),
+(26, 28, '18:04:35', '2024-09-14 11:04:35', '2024-09-14 11:04:35', 0),
+(27, 30, '16:30:09', '2024-09-16 09:30:10', '2024-09-16 09:30:10', 0),
+(28, 32, '17:40:23', '2024-09-16 10:40:25', '2024-09-16 10:40:25', 0),
+(29, 28, '17:44:59', '2024-09-16 10:45:00', '2024-09-16 10:45:00', 0),
+(30, 24, '17:45:06', '2024-09-16 10:45:07', '2024-09-16 10:45:07', 0),
+(31, 19, '17:45:16', '2024-09-16 10:45:17', '2024-09-16 10:45:17', 0),
+(32, 25, '17:45:38', '2024-09-16 10:45:39', '2024-09-16 10:45:39', 0),
+(33, 26, '17:46:13', '2024-09-16 10:46:14', '2024-09-16 10:46:14', 0),
+(34, 13, '17:59:50', '2024-09-16 10:59:51', '2024-09-16 10:59:51', 0),
+(35, 30, '22:10:21', '2024-09-17 15:10:21', '2024-09-17 15:10:21', 0),
+(36, 33, '14:22:00', '2024-09-18 07:22:02', '2024-09-18 07:22:02', 0),
+(37, 34, '08:23:43', '2024-09-19 01:23:43', '2024-09-19 01:23:43', 0),
+(38, 33, '08:25:24', '2024-09-19 01:25:24', '2024-09-19 01:25:24', 0),
+(39, 35, '15:30:15', '2024-09-20 08:30:16', '2024-09-20 08:30:16', 0),
+(40, 26, '15:36:11', '2024-09-20 08:36:13', '2024-09-20 08:36:13', 0),
+(41, 8, '15:36:53', '2024-09-20 08:36:54', '2024-09-20 08:36:54', 0),
+(42, 32, '15:37:12', '2024-09-20 08:37:13', '2024-09-20 08:37:13', 0),
+(43, 25, '15:37:19', '2024-09-20 08:37:20', '2024-09-20 08:37:20', 0),
+(44, 33, '15:38:49', '2024-09-20 08:38:50', '2024-09-20 08:38:50', 0),
+(45, 36, '15:48:00', '2024-09-20 08:48:01', '2024-09-20 08:48:01', 0),
+(46, 31, '22:44:42', '2024-09-22 15:44:44', '2024-09-22 15:44:44', 0),
+(47, 30, '22:45:09', '2024-09-22 15:45:10', '2024-09-22 15:45:10', 0),
+(48, 30, '23:09:34', '2024-09-23 16:09:35', '2024-09-23 16:09:35', 0),
+(49, 31, '23:11:10', '2024-09-23 16:11:11', '2024-09-23 16:11:11', 0),
+(50, 32, '23:11:36', '2024-09-23 16:11:37', '2024-09-23 16:11:37', 0),
+(51, 9, '23:12:17', '2024-09-23 16:12:18', '2024-09-23 16:12:18', 0),
+(52, 13, '23:18:00', '2024-09-23 16:18:01', '2024-09-23 16:18:01', 0),
+(53, 18, '23:18:12', '2024-09-23 16:18:13', '2024-09-23 16:18:13', 0),
+(54, 37, '22:29:04', '2024-09-24 15:29:04', '2024-09-24 15:29:04', 0),
+(55, 33, '22:33:46', '2024-09-24 15:33:46', '2024-09-24 15:33:46', 0),
+(56, 33, '15:01:05', '2024-09-28 08:01:07', '2024-09-28 08:01:07', 0),
+(57, 30, '15:02:07', '2024-09-28 08:02:09', '2024-09-28 08:02:09', 0),
+(58, 31, '23:57:40', '2024-09-28 16:57:42', '2024-09-28 16:57:42', 0),
+(59, 32, '23:59:00', '2024-09-28 16:59:02', '2024-09-28 16:59:02', 0),
+(60, 28, '00:11:20', '2024-09-28 17:11:22', '2024-09-28 17:11:22', 0),
+(61, 27, '00:12:46', '2024-09-28 17:12:51', '2024-09-28 17:12:51', 0),
+(62, 34, '00:14:18', '2024-09-28 17:14:20', '2024-09-28 17:14:20', 0),
+(63, 18, '00:14:29', '2024-09-28 17:14:31', '2024-09-28 17:14:31', 0),
+(64, 36, '00:15:42', '2024-09-28 17:15:44', '2024-09-28 17:15:44', 0),
+(65, 3, '00:43:49', '2024-09-28 17:43:51', '2024-09-28 17:43:51', 0),
+(66, 9, '00:50:22', '2024-09-28 17:50:24', '2024-09-28 17:50:24', 0),
+(67, 30, '16:30:05', '2024-09-29 09:30:05', '2024-09-29 09:30:05', 8);
 
-
-INSERT INTO `canteen_scans` (`id`, `account_id`, `scanned_at`, `created_at`, `updated_at`) VALUES
-(1, 3, '21:29:08', '2024-07-17 14:29:09', '2024-07-17 14:29:09');
-INSERT INTO `canteen_scans` (`id`, `account_id`, `scanned_at`, `created_at`, `updated_at`) VALUES
-(2, 4, '21:49:21', '2024-07-17 14:49:22', '2024-07-17 14:49:22');
-INSERT INTO `canteen_scans` (`id`, `account_id`, `scanned_at`, `created_at`, `updated_at`) VALUES
-(3, 5, '21:58:05', '2024-07-17 14:58:05', '2024-07-17 14:58:05');
-INSERT INTO `canteen_scans` (`id`, `account_id`, `scanned_at`, `created_at`, `updated_at`) VALUES
-(4, 4, '11:30:36', '2024-07-18 04:30:36', '2024-07-18 04:30:36'),
-(5, 6, '14:27:58', '2024-07-18 07:31:21', '2024-07-18 07:31:21'),
-(6, 7, '14:35:00', '2024-07-18 07:38:23', '2024-07-18 07:38:23'),
-(7, 5, '20:11:56', '2024-07-18 13:11:58', '2024-07-18 13:11:58'),
-(8, 3, '20:12:17', '2024-07-18 13:12:19', '2024-07-18 13:12:19'),
-(9, 9, '20:16:01', '2024-07-18 13:16:03', '2024-07-18 13:16:03'),
-(10, 10, '20:16:11', '2024-07-18 13:16:12', '2024-07-18 13:16:12'),
-(11, 11, '21:51:27', '2024-07-18 14:51:28', '2024-07-18 14:51:28'),
-(12, 12, '21:57:36', '2024-07-18 14:57:37', '2024-07-18 14:57:37'),
-(13, 14, '23:39:31', '2024-07-18 16:39:34', '2024-07-18 16:39:34'),
-(14, 5, '20:41:28', '2024-07-19 13:41:30', '2024-07-19 13:41:30'),
-(15, 14, '22:53:12', '2024-07-22 15:53:14', '2024-07-22 15:53:14'),
-(16, 15, '14:07:10', '2024-07-23 07:07:15', '2024-07-23 07:07:15'),
-(17, 13, '20:46:55', '2024-07-23 13:46:57', '2024-07-23 13:46:57'),
-(18, 14, '22:58:44', '2024-07-24 15:58:47', '2024-07-24 15:58:47'),
-(19, 17, '20:08:16', '2024-08-01 13:08:19', '2024-08-01 13:08:19'),
-(20, 20, '11:17:56', '2024-08-13 04:17:58', '2024-08-13 04:17:58'),
-(21, 19, '11:34:49', '2024-08-13 04:34:49', '2024-08-13 04:34:49'),
-(22, 5, '11:35:15', '2024-08-13 04:35:16', '2024-08-13 04:35:16');
+INSERT INTO `event_members` (`id`, `member_name`, `is_additional`, `created_at`, `updated_at`, `preorder_id`) VALUES
+(1, '393700115', 0, '2024-10-03 13:25:59', '2024-10-03 13:25:59', 27);
+INSERT INTO `event_members` (`id`, `member_name`, `is_additional`, `created_at`, `updated_at`, `preorder_id`) VALUES
+(2, '003', 0, '2024-10-03 13:25:59', '2024-10-03 13:25:59', 27);
+INSERT INTO `event_members` (`id`, `member_name`, `is_additional`, `created_at`, `updated_at`, `preorder_id`) VALUES
+(3, '1994', 0, '2024-10-03 13:25:59', '2024-10-03 13:25:59', 27);
+INSERT INTO `event_members` (`id`, `member_name`, `is_additional`, `created_at`, `updated_at`, `preorder_id`) VALUES
+(4, '320950413', 0, '2024-10-03 13:25:59', '2024-10-03 13:25:59', 27),
+(5, '312', 0, '2024-10-03 13:25:59', '2024-10-03 13:25:59', 27),
+(6, '415200101400', 0, '2024-10-03 13:25:59', '2024-10-03 13:25:59', 27),
+(7, '41521010037', 0, '2024-10-03 13:25:59', '2024-10-03 13:25:59', 27),
+(8, '12345678', 0, '2024-10-03 13:25:59', '2024-10-03 13:25:59', 27),
+(9, '76567', 0, '2024-10-03 13:25:59', '2024-10-03 13:25:59', 27),
+(10, '865865', 0, '2024-10-03 13:26:00', '2024-10-03 13:26:00', 27),
+(11, '1006', 0, '2024-10-03 13:26:00', '2024-10-03 13:26:00', 27),
+(12, '098098', 0, '2024-10-03 13:26:00', '2024-10-03 13:26:00', 27),
+(13, '123321', 0, '2024-10-03 13:26:00', '2024-10-03 13:26:00', 27),
+(14, '54321', 0, '2024-10-03 13:26:00', '2024-10-03 13:26:00', 27),
+(15, '41521010176', 0, '2024-10-03 13:26:00', '2024-10-03 13:26:00', 27),
+(16, '09000993', 0, '2024-10-03 13:26:00', '2024-10-03 13:26:00', 27),
+(17, '111133333', 0, '2024-10-03 13:26:00', '2024-10-03 13:26:00', 27),
+(18, '114690444', 0, '2024-10-03 13:26:00', '2024-10-03 13:26:00', 27),
+(19, '30000', 0, '2024-10-03 13:26:00', '2024-10-03 13:26:00', 27),
+(20, '20000', 0, '2024-10-03 13:26:00', '2024-10-03 13:26:00', 27),
+(21, '8000', 0, '2024-10-03 13:26:00', '2024-10-03 13:26:00', 27),
+(22, 'Bagus', 1, '2024-10-03 13:26:00', '2024-10-03 13:26:00', 27),
+(23, 'Bangettt', 1, '2024-10-03 13:26:00', '2024-10-03 13:26:00', 27);
 
 INSERT INTO `faculties` (`id`, `name`, `created_at`, `updated_at`) VALUES
 (1, 'Fasilkom', '2024-09-01 09:15:38', '2024-09-01 09:15:38');
@@ -218,38 +365,51 @@ INSERT INTO `roles` (`id`, `name`, `created_at`, `updated_at`) VALUES
 INSERT INTO `roles` (`id`, `name`, `created_at`, `updated_at`) VALUES
 (3, 'Dekan', '2024-09-01 05:40:46', '2024-09-01 05:40:46');
 INSERT INTO `roles` (`id`, `name`, `created_at`, `updated_at`) VALUES
-(4, 'BAK', '2024-09-01 05:40:46', '2024-09-01 05:40:46'),
+(4, 'SDM', '2024-09-01 05:40:46', '2024-09-16 08:26:59'),
 (5, 'TU', '2024-09-01 05:40:46', '2024-09-01 05:40:46');
 
 INSERT INTO `time_break_sessions` (`id`, `session_name`, `session_open`, `session_close`, `status`, `created_at`, `updated_at`) VALUES
-(1, 'Jam Makan Siang', '10:30:00', '13:30:00', '1', '2024-07-17 14:26:01', '2024-08-13 04:16:51');
+(1, 'Jam Makan Siang', '08:00:00', '18:00:00', '1', '2024-07-17 14:26:01', '2024-09-19 01:22:46');
 INSERT INTO `time_break_sessions` (`id`, `session_name`, `session_open`, `session_close`, `status`, `created_at`, `updated_at`) VALUES
-(7, 'Sesi Sekarang', '14:00:00', '15:00:00', '1', '2024-07-18 07:51:09', '2024-08-02 07:47:08');
+(8, 'Jam Makan Malam', '20:00:00', '23:59:00', '1', '2024-07-18 13:06:04', '2024-09-28 16:57:31');
 INSERT INTO `time_break_sessions` (`id`, `session_name`, `session_open`, `session_close`, `status`, `created_at`, `updated_at`) VALUES
-(8, 'Jam Makan Malam', '20:00:00', '23:50:00', '1', '2024-07-18 13:06:04', '2024-07-23 09:02:40');
+(9, 'Jam makan baru', '00:00:00', '01:00:00', '1', '2024-09-16 10:41:47', '2024-09-28 16:57:16');
 
-INSERT INTO `users` (`id`, `full_name`, `status`, `account_id`, `created_at`, `updated_at`) VALUES
-(1, 'Kevin', '1', 3, '2024-07-17 14:24:33', '2024-07-17 14:25:20');
-INSERT INTO `users` (`id`, `full_name`, `status`, `account_id`, `created_at`, `updated_at`) VALUES
-(2, 'adhen1', '1', 4, '2024-07-17 14:34:17', '2024-07-17 14:43:30');
-INSERT INTO `users` (`id`, `full_name`, `status`, `account_id`, `created_at`, `updated_at`) VALUES
-(3, 'bagaswara', '1', 5, '2024-07-17 14:54:04', '2024-08-01 03:32:37');
-INSERT INTO `users` (`id`, `full_name`, `status`, `account_id`, `created_at`, `updated_at`) VALUES
-(4, 'Tes', '0', 6, '2024-07-18 07:29:50', '2024-07-18 15:56:08'),
-(5, 'coba1', '1', 7, '2024-07-18 07:36:25', '2024-07-18 07:36:43'),
-(6, 'Afiyati', '1', 8, '2024-07-18 07:48:05', '2024-07-18 07:48:05'),
-(7, 'Paul Pogba', '1', 9, '2024-07-18 13:13:48', '2024-07-18 13:13:48'),
-(8, 'Arda', '1', 10, '2024-07-18 13:14:03', '2024-07-18 13:14:03'),
-(9, 'Adhen10', '1', 11, '2024-07-18 14:49:07', '2024-07-18 14:49:07'),
-(10, 'cobalagi', '0', 12, '2024-07-18 14:54:22', '2024-07-18 15:56:03'),
-(11, 'Falah', '1', 13, '2024-07-18 15:54:04', '2024-07-18 15:54:04'),
-(12, 'dafaadly', '1', 14, '2024-07-18 16:30:21', '2024-07-18 16:30:21'),
-(13, 'Bintang Duinata', '1', 15, '2024-07-23 07:05:28', '2024-07-23 07:05:28'),
-(14, 'sri sul', '1', 16, '2024-07-23 07:59:17', '2024-07-23 07:59:17'),
-(15, 'rifq', '1', 17, '2024-08-01 13:05:29', '2024-08-01 13:05:29'),
-(16, 'rfiqi', '1', 18, '2024-08-02 02:46:34', '2024-08-02 02:46:34'),
-(17, 'Sandy M', '1', 19, '2024-08-02 03:51:08', '2024-08-02 03:51:08'),
-(18, 'afi', '1', 20, '2024-08-13 04:15:46', '2024-08-13 04:15:46');
+INSERT INTO `users` (`id`, `full_name`, `status`, `account_id`, `created_at`, `updated_at`, `unit`, `category`, `jobPosition`) VALUES
+(1, 'Kevin', '1', 3, '2024-07-17 14:24:33', '2024-07-17 14:25:20', NULL, NULL, NULL);
+INSERT INTO `users` (`id`, `full_name`, `status`, `account_id`, `created_at`, `updated_at`, `unit`, `category`, `jobPosition`) VALUES
+(2, 'adhen1', '1', 4, '2024-07-17 14:34:17', '2024-07-17 14:43:30', NULL, NULL, NULL);
+INSERT INTO `users` (`id`, `full_name`, `status`, `account_id`, `created_at`, `updated_at`, `unit`, `category`, `jobPosition`) VALUES
+(3, 'bagaswara', '1', 5, '2024-07-17 14:54:04', '2024-08-01 03:32:37', NULL, NULL, NULL);
+INSERT INTO `users` (`id`, `full_name`, `status`, `account_id`, `created_at`, `updated_at`, `unit`, `category`, `jobPosition`) VALUES
+(4, 'Tes', '0', 6, '2024-07-18 07:29:50', '2024-07-18 15:56:08', NULL, NULL, NULL),
+(5, 'coba1', '1', 7, '2024-07-18 07:36:25', '2024-07-18 07:36:43', NULL, NULL, NULL),
+(6, 'Afiyati', '1', 8, '2024-07-18 07:48:05', '2024-07-18 07:48:05', NULL, NULL, NULL),
+(7, 'Paul Pogba', '1', 9, '2024-07-18 13:13:48', '2024-07-18 13:13:48', NULL, NULL, NULL),
+(8, 'Arda', '1', 10, '2024-07-18 13:14:03', '2024-07-18 13:14:03', NULL, NULL, NULL),
+(9, 'Adhen10', '1', 11, '2024-07-18 14:49:07', '2024-07-18 14:49:07', NULL, NULL, NULL),
+(10, 'cobalagi', '0', 12, '2024-07-18 14:54:22', '2024-07-18 15:56:03', NULL, NULL, NULL),
+(11, 'Falah', '1', 13, '2024-07-18 15:54:04', '2024-07-18 15:54:04', NULL, NULL, NULL),
+(12, 'dafaadly', '1', 14, '2024-07-18 16:30:21', '2024-07-18 16:30:21', NULL, NULL, NULL),
+(13, 'Bintang Duinata', '1', 15, '2024-07-23 07:05:28', '2024-07-23 07:05:28', NULL, NULL, NULL),
+(14, 'sri sul', '1', 16, '2024-07-23 07:59:17', '2024-07-23 07:59:17', NULL, NULL, NULL),
+(15, 'rifq', '1', 17, '2024-08-01 13:05:29', '2024-08-01 13:05:29', NULL, NULL, NULL),
+(16, 'rfiqi', '1', 18, '2024-08-02 02:46:34', '2024-08-02 02:46:34', NULL, NULL, NULL),
+(17, 'Sandy M', '1', 19, '2024-08-02 03:51:08', '2024-08-02 03:51:08', NULL, NULL, NULL),
+(18, 'afi', '1', 20, '2024-08-13 04:15:46', '2024-08-13 04:15:46', NULL, NULL, NULL),
+(19, 'prass', '1', 24, '2024-09-09 03:49:31', '2024-09-18 09:11:17', 'Fasilkom', NULL, NULL),
+(20, 'adhenfirman', '1', 25, '2024-09-09 03:53:49', '2024-09-09 03:53:49', NULL, NULL, NULL),
+(21, 'testing kevin', '1', 26, '2024-09-09 16:44:58', '2024-09-09 16:44:58', NULL, NULL, NULL),
+(22, 'tester', '1', 27, '2024-09-11 07:58:42', '2024-09-11 07:58:42', NULL, NULL, NULL),
+(23, 'Tes', '1', 28, '2024-09-11 08:00:03', '2024-09-11 08:00:03', NULL, NULL, NULL),
+(24, 'testing 1 unit', '1', 30, '2024-09-13 15:28:18', '2024-09-13 15:28:18', 'Fasilkom', NULL, NULL),
+(25, 'testing 2 unit', '1', 31, '2024-09-13 15:54:53', '2024-09-13 15:54:53', 'Fasilkom', NULL, NULL),
+(26, 'nama saya kepin', '1', 32, '2024-09-16 10:29:14', '2024-09-17 16:20:56', 'Fasilkom', NULL, NULL),
+(27, 'bagas', '1', 33, '2024-09-18 07:20:21', '2024-09-18 09:09:38', 'Fasilkom', NULL, NULL),
+(28, 'juan', '1', 34, '2024-09-19 01:23:13', '2024-09-19 01:23:13', 'fasilkom', NULL, NULL),
+(29, 'afiyati', '1', 35, '2024-09-20 08:24:25', '2024-09-20 08:24:25', 'fasilkom', NULL, NULL),
+(30, 'kasiyo', '1', 36, '2024-09-20 08:46:51', '2024-09-20 08:46:51', 'fasilkom', NULL, NULL),
+(31, 'bayu', '1', 37, '2024-09-24 15:27:32', '2024-09-24 15:27:32', 'fasilkom', NULL, NULL);
 
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
