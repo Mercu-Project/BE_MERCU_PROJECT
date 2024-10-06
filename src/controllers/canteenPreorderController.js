@@ -776,8 +776,6 @@ const getAdditionalEventMember = async (req, res) => {
         const [countRows] = await db.execute(countQuery, params);
         const totalData = countRows[0].total;
 
-        console.log(dataQuery);
-
         // Execute the data query with pagination
         const [rows] = await db.execute(dataQuery, params);
 

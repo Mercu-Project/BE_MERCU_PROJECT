@@ -62,12 +62,10 @@ const getUsers = async (req, res) => {
                         SELECT a.id FROM accounts a WHERE a.username = em.member_name AND em.is_additional = 0
                     )
                     WHERE em.preorder_id = ?
-                ) THEN 1 ELSE 2 END 
-                LIMIT ${perPage} OFFSET ${offset} `;
+                ) THEN 1 ELSE 2 END `;
             queryParams.push(preorder[0].id);
         } else {
-            orderQuery = ` ORDER BY u.id DESC
-                               LIMIT ${perPage} OFFSET ${offset} `;
+            orderQuery = ` ORDER BY u.id DESC `;
         }
 
         const totalQuery = `
@@ -76,11 +74,13 @@ const getUsers = async (req, res) => {
                 FROM
                     (
                     ${baseQuery}
+                    ${orderQuery}
                 ) AS subquery_alias
             `;
         const paginationQuery = `
                 ${baseQuery}
                 ${orderQuery}
+                LIMIT ${perPage} OFFSET ${offset}
             `;
 
         const [userRows] = await db.execute(paginationQuery, queryParams);
