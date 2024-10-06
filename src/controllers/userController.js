@@ -11,20 +11,25 @@ const { ERR_MSG } = require('../utils/constants');
 
 const getUsers = async (req, res) => {
     try {
-        let { limit, page, search = '', number } = req.query;
+        let { limit, page, search = '', number, unit = '' } = req.query;
 
         const { perPage, currentPage } = parseOrUseDefault(limit, page);
         const offset = getOffset(perPage, currentPage);
 
-        let whereClause = '';
+        let whereClause = ' WHERE 1 = 1 ';
         let queryParams = [];
 
         if (search) {
-            whereClause = `WHERE LOWER(u.full_name) LIKE ? OR LOWER(acc.username) LIKE ?`;
+            whereClause += ` AND LOWER(u.full_name) LIKE ? OR LOWER(acc.username) LIKE ? `;
             queryParams.push(
                 `%${search.toLowerCase()}%`,
                 `%${search.toLowerCase()}%`
             );
+        }
+
+        if (unit) {
+            whereClause += ` AND LOWER(u.unit) = ? `;
+            queryParams.push(unit.toLowerCase());
         }
 
         const baseQuery = `
