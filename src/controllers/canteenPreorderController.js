@@ -491,7 +491,7 @@ const editPreorder = async (req, res) => {
             ROLES.DEKAN,
         ]);
         const [updatePreorder] = await connection.execute(
-            `UPDATE canteen_preorders SET event_date = ?, status = ?, request_count = request_count + 1, event_name = ? reject_reason = NULL WHERE id = ?`,
+            `UPDATE canteen_preorders SET event_date = ?, status = ?, request_count = request_count + 1, event_name = ?, reject_reason = NULL WHERE id = ?`,
             [eventDate, pendingStatus, eventName, id]
         );
 
