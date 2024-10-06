@@ -552,7 +552,7 @@ const editPreorder = async (req, res) => {
             const [insertEventMember] = await connection.execute(
                 `INSERT INTO event_members (member_name, is_additional, preorder_id)
                 VALUES (?, ?, ?)`,
-                [eventMember.username, false, preorderId]
+                [eventMember.username, false, id]
             );
 
             if (insertEventMember.affectedRows === 0) {
@@ -566,7 +566,7 @@ const editPreorder = async (req, res) => {
             const [insertEventMember] = await connection.execute(
                 `INSERT INTO event_members (member_name, is_additional, preorder_id)
                 VALUES (?, ?, ?)`,
-                [additional.fullName, true, preorderId]
+                [additional.fullName, true, id]
             );
 
             if (insertEventMember.affectedRows === 0) {
