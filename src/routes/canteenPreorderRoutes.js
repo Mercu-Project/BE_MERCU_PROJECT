@@ -48,5 +48,6 @@ router.get(
     auth,
     CanteenPreorder.getPreorderEditData
 );
+router.patch('/finish-preorder/:id', CanteenPreorder.finishPreorder);
 
 module.exports = router;

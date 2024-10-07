@@ -108,8 +108,13 @@ const submitPreorder = async (req, res) => {
         /* Insert preorder types */
         for (const preOrderType of preorderTypes) {
             const [newPreorderType] = await connection.execute(
-                'INSERT INTO canteen_preorder_detail (order_type, qty, preorder_id) VALUES (?, ?, ?)',
-                [preOrderType.orderType, preOrderType.qty, preorderId]
+                'INSERT INTO canteen_preorder_detail (order_type, qty, preorder_id, price) VALUES (?, ?, ?, ?)',
+                [
+                    preOrderType.orderType,
+                    preOrderType.qty,
+                    preorderId,
+                    preOrderType.price,
+                ]
             );
 
             if (newPreorderType.affectedRows === 0) {
@@ -626,6 +631,15 @@ const getPreorderDetail = async (req, res) => {
     try {
         const { id } = req.params;
 
+        const [getPreorder] = await db.execute(
+            `SELECT is_finished FROM canteen_preorders WHERE id = ?`,
+            [id]
+        );
+
+        if (!getPreorder.length) {
+            return httpResponse(res, httpStatus.NOT_FOUND, 'data not found');
+        }
+
         const [rows] = await db.execute(
             `SELECT 
                 cpd.id,
@@ -633,7 +647,9 @@ const getPreorderDetail = async (req, res) => {
                 cpd.order_type,
                 cpd.qty,
                 cpd.created_at,
-                cpd.updated_at
+                cpd.updated_at,
+                cpd.price,
+                (cpd.qty * cpd.price) AS total
             FROM 
                 canteen_preorder_detail cpd
             WHERE 
@@ -650,7 +666,17 @@ const getPreorderDetail = async (req, res) => {
             );
         }
 
-        return httpResponse(res, httpStatus.OK, 'get preorder detail', rows);
+        const response = {
+            orders: rows,
+            isFinished: getPreorder[0].is_finished === 1,
+        };
+
+        return httpResponse(
+            res,
+            httpStatus.OK,
+            'get preorder detail',
+            response
+        );
     } catch (error) {
         return serverErrorResponse(res, error);
     }
@@ -900,6 +926,69 @@ const getPreorderEditData = async (req, res) => {
     }
 };
 
+const finishPreorder = async (req, res) => {
+    let connection;
+    try {
+        const { preorderTypes } = req.body;
+        const { id } = req.params;
+
+        connection = await db.getConnection();
+
+        const [getPreorder] = await connection.execute(
+            `SELECT is_finished FROM canteen_preorders WHERE id = ?`,
+            [id]
+        );
+
+        if (!getPreorder.length) {
+            await connection.rollback();
+            return httpResponse(res, httpStatus.NOT_FOUND, 'Data not found');
+        }
+
+        if (getPreorder[0].is_finished) {
+            await connection.rollback();
+            return httpResponse(
+                res,
+                httpStatus.FORBIDDEN,
+                'Preorder already finished'
+            );
+        }
+
+        const [updatePreorder] = await connection.execute(
+            `UPDATE canteen_preorders SET is_finished = 1 WHERE id = ?`,
+            [id]
+        );
+
+        if (updatePreorder.affectedRows === 0) {
+            await connection.rollback();
+            throw new Error('Failed executing update preorder');
+        }
+
+        for (const preorderType of preorderTypes) {
+            const [updatePt] = await connection.execute(
+                `UPDATE canteen_preorder_detail SET price = ? WHERE id = ?`,
+                [preorderType.price, preorderType.id]
+            );
+
+            if (updatePt.affectedRows === 0) {
+                await connection.rollback();
+                throw new Error('Failed executing update preorder detail');
+            }
+        }
+
+        await connection.commit();
+        connection.release();
+
+        return httpResponse(res, httpStatus.OK, 'Success Finishing Preorder');
+    } catch (error) {
+        if (connection) {
+            await connection.rollback();
+            connection.release();
+        }
+
+        return serverErrorResponse(res, error);
+    }
+};
+
 module.exports = {
     submitPreorder,
     approvalPreorder,
@@ -910,4 +999,5 @@ module.exports = {
     getEventMember,
     getAdditionalEventMember,
     getPreorderEditData,
+    finishPreorder,
 };
