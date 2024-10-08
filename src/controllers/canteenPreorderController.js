@@ -855,7 +855,8 @@ const getPreorderEditData = async (req, res) => {
                 cp.faculty_id,
                 cp.reject_reason,
                 cp.attachment_path,
-                cp.event_name AS eventName
+                cp.event_name AS eventName,
+                cpd.price
             FROM 
                 canteen_preorder_detail cpd
             JOIN 
@@ -891,6 +892,7 @@ const getPreorderEditData = async (req, res) => {
                 id: row.detail_id,
                 orderType: row.order_type,
                 qty: row.qty,
+                price: row.price,
                 created_at: row.detail_created_at,
                 updated_at: row.detail_updated_at,
             })),
@@ -967,8 +969,8 @@ const finishPreorder = async (req, res) => {
         }
 
         const [updatePreorder] = await connection.execute(
-            `UPDATE canteen_preorders SET is_finished = 1 WHERE id = ?`,
-            [id]
+            `UPDATE canteen_preorders SET is_finished = 1, status = ? WHERE id = ?`,
+            [PO_STAT.DONE, id]
         );
 
         if (updatePreorder.affectedRows === 0) {

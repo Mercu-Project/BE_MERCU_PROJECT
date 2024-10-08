@@ -31,6 +31,7 @@ module.exports = {
         APPROVE_PAYLOAD: 'Disetujui',
         APPROVE: 'Disetujui oleh {0}',
         CANTEEN_PROCESS: 'Menunggu Proses Kantin',
+        DONE: 'Selesai',
     },
 
     /* Role Constants */
