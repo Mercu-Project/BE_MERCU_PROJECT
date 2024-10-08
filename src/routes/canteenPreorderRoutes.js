@@ -57,9 +57,14 @@ router.patch(
 router.get(
     '/print-invoice/:id',
     auth,
-    checkRole([ROLES.BAK, ROLES.ADMIN]),
+    checkRole([ROLES.SDM, ROLES.ADMIN]),
     CanteenPreorder.printInvoice
 );
-router.get('/get-summary', CanteenPreorder.getSummary);
+router.get(
+    '/get-summary',
+    auth,
+    checkRole([ROLES.SDM, ROLES.ADMIN]),
+    CanteenPreorder.getSummary
+);
 
 module.exports = router;
