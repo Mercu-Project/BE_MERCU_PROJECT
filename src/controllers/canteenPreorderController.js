@@ -362,7 +362,7 @@ const approvalPreorder = async (req, res) => {
 
 const getPreorders = async (req, res) => {
     try {
-        let { limit, page, search = '' } = req.query;
+        let { limit, page, search = '', isHistory = false } = req.query;
         const { role } = req.user;
 
         limit = parseInt(limit) || 10;
@@ -393,21 +393,31 @@ const getPreorders = async (req, res) => {
         }
 
         let filterStatusQuery = '';
-        if (isEqual(role, ROLES.BAK)) {
-            // Filter for BAK role: Preorders with status 'Menunggu Persetujuan BAK' in status history
+
+        if (isHistory) {
             filterStatusQuery = `
-                AND EXISTS (
-                    SELECT 1
-                    FROM canteen_preorder_status_history cposh
-                    WHERE cposh.preorder_id = cpo.id
-                    AND cposh.status = '${replacePlaceholders(PO_STAT.PENDING, [
-                        ROLES.BAK,
-                    ])}'
-                )
+                AND cpo.status IN (${
+                    (PO_STAT.DONE, PO_STAT.REJECT_BY_SYSTEM)
+                })            
             `;
-        } else if (isEqual(role, ROLES.ADMIN)) {
-            // Filter for Admin role: Only show preorders with status 'Menunggu Proses Kantin'
-            filterStatusQuery = `AND cpo.status = '${PO_STAT.CANTEEN_PROCESS}'`;
+        } else {
+            if (isEqual(role, ROLES.BAK)) {
+                // Filter for BAK role: Preorders with status 'Menunggu Persetujuan BAK' in status history
+                filterStatusQuery = `
+                    AND EXISTS (
+                        SELECT 1
+                        FROM canteen_preorder_status_history cposh
+                        WHERE cposh.preorder_id = cpo.id
+                        AND cposh.status = '${replacePlaceholders(
+                            PO_STAT.PENDING,
+                            [ROLES.BAK]
+                        )}'
+                    )
+                `;
+            } else if (isEqual(role, ROLES.ADMIN)) {
+                // Filter for Admin role: Only show preorders with status 'Menunggu Proses Kantin'
+                filterStatusQuery = `AND cpo.status = '${PO_STAT.CANTEEN_PROCESS}'`;
+            }
         }
 
         // Add condition to exclude records with status 'Ditolak oleh Sistem'
@@ -421,7 +431,7 @@ const getPreorders = async (req, res) => {
             LEFT JOIN canteen_preorder_detail cpod ON cpo.id = cpod.preorder_id
             WHERE cpo.faculty_id = ?
             ${filterStatusQuery}
-            ${excludeRejectedBySystemQuery}
+            ${isHistory ? '' : excludeRejectedBySystemQuery}
         `,
             [req.user.facultyId]
         );
@@ -446,7 +456,7 @@ const getPreorders = async (req, res) => {
             WHERE
                 cpo.faculty_id = ?
                 ${filterStatusQuery}
-                ${excludeRejectedBySystemQuery}
+                ${isHistory ? '' : excludeRejectedBySystemQuery}
             GROUP BY 
                 cpo.id
             ORDER BY
