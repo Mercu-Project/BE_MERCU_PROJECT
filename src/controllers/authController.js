@@ -159,7 +159,7 @@ const login = async (req, res) => {
         const tbl = roleRows[0].name === 'User' ? 'users' : 'admins';
 
         const [detailAccountRows] = await db.execute(
-            `SELECT full_name FROM ${tbl} WHERE account_id = ? `,
+            `SELECT full_name, unit FROM ${tbl} WHERE account_id = ? `,
             [rows[0].id]
         );
 
@@ -170,6 +170,7 @@ const login = async (req, res) => {
             role: roleRows[0].name,
             facultyId: rows[0].faculty_id,
             facultyName: rows[0].faculty_name,
+            unit: detailAccountRows[0].unit,
         };
 
         const token = jwt.generateToken(payload);
