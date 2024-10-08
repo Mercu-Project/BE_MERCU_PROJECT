@@ -424,6 +424,7 @@ const getPreorders = async (req, res) => {
                 cpo.status,
                 cpo.number,
                 cpo.reject_reason,
+                cpo.unit,
                 SUM(cpod.qty) AS total_quantity
             FROM 
                 canteen_preorders cpo
