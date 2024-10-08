@@ -396,9 +396,7 @@ const getPreorders = async (req, res) => {
 
         if (isHistory) {
             filterStatusQuery = `
-                AND cpo.status IN (${
-                    (PO_STAT.DONE, PO_STAT.REJECT_BY_SYSTEM)
-                })            
+                AND cpo.status IN ('${PO_STAT.DONE}', '${PO_STAT.REJECT_BY_SYSTEM}')            
             `;
         } else {
             if (isEqual(role, ROLES.BAK)) {
