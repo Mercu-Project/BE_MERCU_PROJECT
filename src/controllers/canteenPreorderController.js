@@ -41,6 +41,7 @@ const submitPreorder = async (req, res) => {
             eventName,
             eventMembers,
             additionalEventMember,
+            unit,
         } = req.body;
         // const attachmentPath = req.file ? req.file.path : null; // Save the file path if a file is uploaded
         const attachmentPath = null;
@@ -95,7 +96,7 @@ const submitPreorder = async (req, res) => {
         ]);
 
         const [newPreorder] = await connection.execute(
-            'INSERT INTO canteen_preorders (requester_id, event_date, request_count, status, number, faculty_id, event_name) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO canteen_preorders (requester_id, event_date, request_count, status, number, faculty_id, event_name, unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 req.user.id,
                 eventDate,
@@ -104,6 +105,7 @@ const submitPreorder = async (req, res) => {
                 nomorPengajuan,
                 req.user.facultyId,
                 eventName,
+                unit,
             ]
         );
 
@@ -465,6 +467,7 @@ const editPreorder = async (req, res) => {
             eventName,
             eventMembers,
             additionalEventMember,
+            unit,
         } = req.body;
 
         eventDate = convertToJakartaTime(eventDate);
@@ -505,8 +508,8 @@ const editPreorder = async (req, res) => {
             ROLES.DEKAN,
         ]);
         const [updatePreorder] = await connection.execute(
-            `UPDATE canteen_preorders SET event_date = ?, status = ?, request_count = request_count + 1, event_name = ?, reject_reason = NULL WHERE id = ?`,
-            [eventDate, pendingStatus, eventName, id]
+            `UPDATE canteen_preorders SET event_date = ?, status = ?, request_count = request_count + 1, event_name = ?, reject_reason = NULL, unit = ? WHERE id = ?`,
+            [eventDate, pendingStatus, eventName, unit, id]
         );
 
         const changedAt = getCurrentTime();
