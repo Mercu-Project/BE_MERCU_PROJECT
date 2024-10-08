@@ -10,7 +10,7 @@ const {
     isBlank,
     isContains,
 } = require('../utils/compareUtil');
-const { replacePlaceholders } = require('../utils/stringUtil');
+const { replacePlaceholders, replaceString } = require('../utils/stringUtil');
 const {
     buildPaginationData,
     parseOrUseDefault,
@@ -21,7 +21,16 @@ const {
     convertToJakartaTime,
     getCurrentTime,
     getDayDifference,
+    formatIndonesianDate,
 } = require('../utils/dateUtil');
+const { default: puppeteer } = require('puppeteer');
+const {
+    invoiceTemplate,
+    generateTableRow,
+    generatePPNRow,
+    generateTotalAmountRow,
+} = require('../utils/pdfTemplate');
+const { getPPN, toWords } = require('../utils/priceUtil');
 
 const submitPreorder = async (req, res) => {
     let connection;
@@ -989,6 +998,111 @@ const finishPreorder = async (req, res) => {
     }
 };
 
+const printInvoice = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const browser = await puppeteer.launch();
+        const page = await browser.newPage();
+
+        let htmlTemplate = invoiceTemplate;
+
+        const [cpoRows] = await db.execute(
+            `SELECT
+                CONVERT_TZ(event_date, '+00:00', 'Asia/Jakarta') AS eventDate,
+                event_name AS eventName,
+                unit
+            FROM
+                canteen_preorders
+            WHERE
+                id = ?
+            `,
+            [id]
+        );
+
+        if (!cpoRows.length) {
+            return httpResponse(res, httpStatus.NOT_FOUND, 'Data not found');
+        }
+
+        const [cpdRows] = await db.execute(
+            `SELECT
+                order_type,
+                qty,
+                price,
+                (price * qty) AS total 
+            FROM 
+                canteen_preorder_detail 
+            WHERE
+                preorder_id = ?`,
+            [id]
+        );
+
+        let tableRows = ``;
+        let no = 1;
+
+        for (const cpd of cpdRows) {
+            tableRows += generateTableRow(
+                no++,
+                cpd.order_type,
+                cpd.qty,
+                cpd.price,
+                cpd.total
+            );
+            tableRows += `\n`;
+        }
+
+        const total = cpdRows.reduce((acc, cpd) => acc + cpd.total, 0);
+        const ppn = getPPN(total);
+        const totalAmount = total + ppn;
+
+        tableRows += generatePPNRow(ppn);
+        tableRows += generateTotalAmountRow(totalAmount);
+
+        htmlTemplate = replaceString(htmlTemplate, '[TABLE_ROWS]', tableRows);
+        htmlTemplate = replaceString(
+            htmlTemplate,
+            '[TERBILANG]',
+            toWords(totalAmount)
+        );
+        htmlTemplate = replaceString(
+            htmlTemplate,
+            '[NOW]',
+            formatIndonesianDate(new Date())
+        );
+        htmlTemplate = replaceString(
+            htmlTemplate,
+            '[EVENT_NAME]',
+            cpoRows[0].eventName
+        );
+        htmlTemplate = replaceString(
+            htmlTemplate,
+            '[EVENT_DATE]',
+            formatIndonesianDate(cpoRows[0].eventDate)
+        );
+        htmlTemplate = replaceString(htmlTemplate, '[UNIT]', cpoRows[0].unit);
+
+        await page.setContent(htmlTemplate);
+
+        const pdfPath = 'invoice.pdf';
+
+        await page.pdf({
+            path: pdfPath,
+            format: 'A4',
+            printBackground: true,
+        });
+
+        await browser.close();
+
+        res.download(pdfPath, 'invoice.pdf', (err) => {
+            if (err) {
+                throw new Error('Error generating PDF');
+            }
+        });
+    } catch (error) {
+        return serverErrorResponse(res, error);
+    }
+};
+
 module.exports = {
     submitPreorder,
     approvalPreorder,
@@ -1000,4 +1114,5 @@ module.exports = {
     getAdditionalEventMember,
     getPreorderEditData,
     finishPreorder,
+    printInvoice,
 };

@@ -48,6 +48,17 @@ router.get(
     auth,
     CanteenPreorder.getPreorderEditData
 );
-router.patch('/finish-preorder/:id', CanteenPreorder.finishPreorder);
+router.patch(
+    '/finish-preorder/:id',
+    auth,
+    checkRole(ROLES.ADMIN),
+    CanteenPreorder.finishPreorder
+);
+router.get(
+    '/print-invoice/:id',
+    auth,
+    checkRole(ROLES.BAK, ROLES.ADMIN),
+    CanteenPreorder.printInvoice
+);
 
 module.exports = router;

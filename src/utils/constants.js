@@ -40,6 +40,7 @@ module.exports = {
         USER: 'User',
         DEKAN: 'Dekan',
         BAK: 'SDM',
+        SDM: 'SDM',
     },
 
     /* Date Format Type */
@@ -53,4 +54,7 @@ module.exports = {
     DATE_TZ: {
         JAKARTA: 'Asia/Jakarta',
     },
+
+    /* Default PPN */
+    DEFAULT_PPN: 0.11, // 11%
 };

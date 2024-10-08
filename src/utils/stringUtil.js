@@ -5,6 +5,22 @@ const replacePlaceholders = (str, replacements) => {
     );
 };
 
+const replaceString = (
+    originalString,
+    searchValue,
+    replacement,
+    replaceAll = false
+) => {
+    if (replaceAll) {
+        return originalString.replace(
+            new RegExp(searchValue, 'g'),
+            replacement
+        );
+    }
+    return originalString.replace(searchValue, replacement);
+};
+
 module.exports = {
     replacePlaceholders,
+    replaceString,
 };
