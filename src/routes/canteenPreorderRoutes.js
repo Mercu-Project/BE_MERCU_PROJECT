@@ -57,7 +57,7 @@ router.patch(
 router.get(
     '/print-invoice/:id',
     auth,
-    checkRole(ROLES.BAK, ROLES.ADMIN),
+    checkRole([ROLES.BAK, ROLES.ADMIN]),
     CanteenPreorder.printInvoice
 );
 
