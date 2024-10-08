@@ -415,6 +415,19 @@ const getPreorders = async (req, res) => {
          AND cpo.status != '${PO_STAT.REJECT_BY_SYSTEM}'
      `;
 
+        const [countResult] = await db.execute(
+            `SELECT COUNT(*) as total
+            FROM canteen_preorders cpo
+            LEFT JOIN canteen_preorder_detail cpod ON cpo.id = cpod.preorder_id
+            WHERE cpo.faculty_id = ?
+            ${filterStatusQuery}
+            ${excludeRejectedBySystemQuery}
+        `,
+            [req.user.facultyId]
+        );
+
+        const totalRecords = countResult[0].total;
+
         const [rows] = await db.execute(
             `SELECT 
                 cpo.id,
@@ -444,7 +457,7 @@ const getPreorders = async (req, res) => {
             [req.user.facultyId]
         );
 
-        const pagination = buildPaginationData(limit, page, rows.length);
+        const pagination = buildPaginationData(limit, page, totalRecords);
 
         return httpResponse(
             res,
