@@ -30,7 +30,7 @@ const {
     generatePPNRow,
     generateTotalAmountRow,
 } = require('../utils/pdfTemplate');
-const { getPPN, toWords } = require('../utils/priceUtil');
+const { getPPN, toWords, formatRupiah } = require('../utils/priceUtil');
 
 const submitPreorder = async (req, res) => {
     let connection;
@@ -557,8 +557,13 @@ const editPreorder = async (req, res) => {
         /* Looping data preorder types dan insert baru */
         for (const preorderType of preorderTypes) {
             const [insertNewPreorderType] = await connection.execute(
-                `INSERT INTO canteen_preorder_detail (preorder_id, order_type, qty) VALUES (?, ?, ?)`,
-                [id, preorderType.orderType, preorderType.qty]
+                `INSERT INTO canteen_preorder_detail (preorder_id, order_type, qty, price) VALUES (?, ?, ?, ?)`,
+                [
+                    id,
+                    preorderType.orderType,
+                    preorderType.qty,
+                    preorderType.price,
+                ]
             );
 
             if (insertNewPreorderType.affectedRows === 0) {
@@ -1122,6 +1127,88 @@ const printInvoice = async (req, res) => {
     }
 };
 
+const getSummary = async (req, res) => {
+    try {
+        const { from, to, limit, page } = req.query;
+
+        const { currentPage, perPage } = parseOrUseDefault(limit, page);
+        const offset = getOffset(perPage, currentPage);
+
+        // Data query for fetching results
+        const dataQuery = `
+            SELECT 
+                CONVERT_TZ(cpo.event_date, '+00:00', 'Asia/Jakarta') AS eventDate,
+                COALESCE(cpo.unit, '') AS unit,
+                (SELECT COALESCE(SUM(cpod.qty), 0)
+                 FROM canteen_preorder_detail cpod
+                 WHERE cpod.preorder_id = cpo.id) AS totalQty,
+                (SELECT COALESCE(SUM(cpod.price), 0)
+                 FROM canteen_preorder_detail cpod
+                 WHERE cpod.preorder_id = cpo.id) AS totalPrice
+            FROM 
+                canteen_preorders cpo
+            WHERE 
+                DATE(CONVERT_TZ(cpo.event_date, '+00:00', 'Asia/Jakarta')) BETWEEN ? AND ?
+            AND
+                cpo.status = ?
+            ORDER BY 
+                CONVERT_TZ(cpo.event_date, '+00:00', 'Asia/Jakarta')
+            LIMIT ${perPage} OFFSET ${offset}
+        `;
+
+        // Count query for pagination
+        const countQuery = `
+            SELECT COUNT(*) AS total
+            FROM 
+                canteen_preorders cpo
+            WHERE 
+                DATE(CONVERT_TZ(cpo.event_date, '+00:00', 'Asia/Jakarta')) BETWEEN ? AND ?
+            AND
+                cpo.status = ?
+        `;
+
+        const queryParams = [PO_STAT.DONE, from, to];
+
+        // Execute the data query
+        const [rows] = await db.execute(dataQuery, queryParams);
+
+        // Execute the count query (without pagination)
+        const [totalRows] = await db.execute(countQuery, queryParams);
+
+        // Calculate grand total of prices from the data query
+        const grandTotal = rows.reduce(
+            (acc, cpo) => acc + (Number(cpo.totalPrice) || 0),
+            0
+        );
+
+        const response = {
+            grandTotal: `Rp ${formatRupiah(grandTotal)}`,
+            preorders: rows.map((row) => ({
+                eventDate: row.eventDate,
+                unit: row.unit,
+                totalQty: Number(row.totalQty) || 0,
+                totalPrice: `Rp ${formatRupiah(Number(row.totalPrice) || 0)}`,
+            })),
+        };
+
+        const pagination = buildPaginationData(
+            perPage,
+            currentPage,
+            totalRows[0].total
+        );
+
+        return httpResponse(
+            res,
+            httpStatus.OK,
+            'get summary',
+            response,
+            pagination
+        );
+    } catch (error) {
+        return serverErrorResponse(res, error);
+    }
+};
+
 module.exports = {
     submitPreorder,
     approvalPreorder,
@@ -1134,4 +1221,5 @@ module.exports = {
     getPreorderEditData,
     finishPreorder,
     printInvoice,
+    getSummary,
 };

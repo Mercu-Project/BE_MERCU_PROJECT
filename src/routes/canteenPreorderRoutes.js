@@ -60,5 +60,6 @@ router.get(
     checkRole([ROLES.BAK, ROLES.ADMIN]),
     CanteenPreorder.printInvoice
 );
+router.get('/get-summary', CanteenPreorder.getSummary);
 
 module.exports = router;
