@@ -258,7 +258,7 @@ const invoiceTemplate = `<html>
                 <p>Jakarta, [NOW]</p>
             </div>
             <div class="letter_id">
-                <p>001M/SCN/VII/2024</p>
+                <p>[NUMBER]</p>
             </div>
         </section>
         <section id="pelanggan">

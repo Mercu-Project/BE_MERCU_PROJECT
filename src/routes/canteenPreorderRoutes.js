@@ -66,5 +66,6 @@ router.get(
     checkRole([ROLES.SDM, ROLES.ADMIN]),
     CanteenPreorder.getSummary
 );
+router.get('/export-summary', CanteenPreorder.exportSummary);
 
 module.exports = router;

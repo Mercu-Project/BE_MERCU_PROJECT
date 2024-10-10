@@ -31,6 +31,8 @@ const {
     generateTotalAmountRow,
 } = require('../utils/pdfTemplate');
 const { getPPN, toWords, formatRupiah } = require('../utils/priceUtil');
+const ExcelJS = require('exceljs');
+const moment = require('moment-timezone');
 
 const submitPreorder = async (req, res) => {
     let connection;
@@ -43,13 +45,6 @@ const submitPreorder = async (req, res) => {
             additionalEventMember,
             unit,
         } = req.body;
-        // const attachmentPath = req.file ? req.file.path : null; // Save the file path if a file is uploaded
-        const attachmentPath = null;
-        // Save the file path if a file is uploaded
-        // Parse preorderTypes from JSON string if necessary
-        // if (typeof preorderTypes === 'string') {
-        //     preorderTypes = JSON.parse(preorderTypes);
-        // }
 
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
@@ -214,7 +209,7 @@ const approvalPreorder = async (req, res) => {
 
         /* Query untuk pengecekan preorder lama ada atau tidak di database */
         const [checkPreorder] = await connection.execute(
-            'SELECT faculty_id FROM canteen_preorders WHERE id = ?',
+            'SELECT unit FROM canteen_preorders WHERE id = ?',
             [id]
         );
 
@@ -228,14 +223,17 @@ const approvalPreorder = async (req, res) => {
             );
         }
 
-        /* Pastikan data yang akan dilakukan approval merupakan data fakultas yang sama dengan approver (user yang melakaukan approval) */
-        if (isNotEqual(checkPreorder[0].faculty_id, req.user.facultyId)) {
-            await connection.rollback();
-            return httpResponse(
-                res,
-                httpStatus.FORBIDDEN,
-                'action is forbidden'
-            );
+        /* Pastikan data yang akan dilakukan approval merupakan data unit yang sama dengan 
+        approver (user yang melakaukan approval) jika role user tersebut adalah DEKAN */
+        if (isEqual(req.user.role, ROLES.DEKAN)) {
+            if (isNotEqual(checkPreorder[0].unit, req.user.unit)) {
+                await connection.rollback();
+                return httpResponse(
+                    res,
+                    httpStatus.FORBIDDEN,
+                    'action is forbidden'
+                );
+            }
         }
 
         let preorderStatus = '';
@@ -263,50 +261,24 @@ const approvalPreorder = async (req, res) => {
         } else if (isEqual(status, PO_STAT.APPROVE_PAYLOAD)) {
             rejectReason = null;
             if (isEqual(role, ROLES.DEKAN)) {
-                /* Jika status === 'Disetujui' dan role == 'Dekan' maka status = 'Menunggu Persetujuan BAK' */
+                /* Jika status === 'Disetujui' dan role == 'Dekan' maka status = 'Menunggu Persetujuan SDM' */
                 preorderStatus = replacePlaceholders(PO_STAT.PENDING, [
                     ROLES.BAK,
                 ]);
 
-                /* Audit status 'Disetujui oleh Dekan' */
-                const auditStatus = replacePlaceholders(PO_STAT.APPROVE, [
-                    ROLES.DEKAN,
-                ]);
-                const [auditApprByDekan] = await connection.execute(
-                    sqlStatusHistory,
-                    [id, auditStatus, changedAt, null, req.user.id]
-                );
-                if (auditApprByDekan.affectedRows === 0) {
-                    await connection.rollback();
-                    throw new Error('failed executing audit approve by dekan');
-                }
-
-                /* Audit status 'Menunggu Persetujuan BAK' */
-                const [auditPendBAK] = await connection.execute(
+                /* Audit status 'Menunggu Persetujuan SDM' */
+                const [auditPendSDM] = await connection.execute(
                     sqlStatusHistory,
                     [id, preorderStatus, changedAt, null, req.user.id]
                 );
 
-                if (auditPendBAK.affectedRows === 0) {
+                if (auditPendSDM.affectedRows === 0) {
                     await connection.rollback();
-                    throw new Error('failed executing audit pending BAK');
+                    throw new Error('failed executing audit pending SDM');
                 }
-            } else if (isEqual(role, ROLES.BAK)) {
+            } else if (isEqual(role, ROLES.SDM)) {
                 /* Jika status === 'Disetujui' dan role == 'BAK' maka status = 'Menunggu Proses Kantin' */
                 preorderStatus = PO_STAT.CANTEEN_PROCESS;
-
-                /* Audit status 'Disetujui oleh BAK' */
-                const auditStatus = replacePlaceholders(PO_STAT.APPROVE, [
-                    ROLES.BAK,
-                ]);
-                const [auditApprByBAK] = await connection.execute(
-                    sqlStatusHistory,
-                    [id, auditStatus, changedAt, null, req.user.id]
-                );
-                if (auditApprByBAK.affectedRows === 0) {
-                    await connection.rollback();
-                    throw new Error('failed executing audit approve by BAK');
-                }
 
                 /* Audit status 'Menunggu Prose Kantin' */
                 const [auditCanteenProc] = await connection.execute(
@@ -362,7 +334,7 @@ const approvalPreorder = async (req, res) => {
 
 const getPreorders = async (req, res) => {
     try {
-        let { limit, page, search = '', isHistory = false } = req.query;
+        let { limit, page, isHistory = false, from = '', to = '' } = req.query;
         const { role } = req.user;
 
         limit = parseInt(limit) || 10;
@@ -372,8 +344,8 @@ const getPreorders = async (req, res) => {
 
         const [checkExpPO] = await db.execute(
             `SELECT CONVERT_TZ(event_date, '+00:00', 'Asia/Jakarta') AS eventDate, status, id
-            FROM canteen_preorders WHERE faculty_id = ?`,
-            [req.user.facultyId]
+            FROM canteen_preorders WHERE unit = ?`,
+            [req.user.unit]
         );
 
         for (const po of checkExpPO) {
@@ -392,52 +364,16 @@ const getPreorders = async (req, res) => {
             }
         }
 
-        let filterStatusQuery = '';
-
-        if (isHistory) {
-            filterStatusQuery = `
-                AND cpo.status IN ('${PO_STAT.DONE}', '${PO_STAT.REJECT_BY_SYSTEM}')            
-            `;
-        } else {
-            if (isEqual(role, ROLES.BAK)) {
-                // Filter for BAK role: Preorders with status 'Menunggu Persetujuan BAK' in status history
-                filterStatusQuery = `
-                    AND EXISTS (
-                        SELECT 1
-                        FROM canteen_preorder_status_history cposh
-                        WHERE cposh.preorder_id = cpo.id
-                        AND cposh.status = '${replacePlaceholders(
-                            PO_STAT.PENDING,
-                            [ROLES.BAK]
-                        )}'
-                    )
-                `;
-            } else if (isEqual(role, ROLES.ADMIN)) {
-                // Filter for Admin role: Only show preorders with status 'Menunggu Proses Kantin'
-                filterStatusQuery = `AND cpo.status = '${PO_STAT.CANTEEN_PROCESS}'`;
-            }
-        }
-
-        // Add condition to exclude records with status 'Ditolak oleh Sistem'
-        const excludeRejectedBySystemQuery = `
-         AND cpo.status != '${PO_STAT.REJECT_BY_SYSTEM}'
-     `;
-
-        const [countResult] = await db.execute(
-            `SELECT COUNT(*) as total
+        /* Construct Query */
+        let queryParams = [];
+        let countQuery = `
+            SELECT COUNT(*) as total
             FROM canteen_preorders cpo
-            LEFT JOIN canteen_preorder_detail cpod ON cpo.id = cpod.preorder_id
-            WHERE cpo.faculty_id = ?
-            ${filterStatusQuery}
-            ${isHistory ? '' : excludeRejectedBySystemQuery}
-        `,
-            [req.user.facultyId]
-        );
-
-        const totalRecords = countResult[0].total;
-
-        const [rows] = await db.execute(
-            `SELECT 
+            -- LEFT JOIN canteen_preorder_detail cpod ON cpo.id = cpod.preorder_id
+            WHERE 1 = 1
+        `;
+        let dataQuery = `
+            SELECT 
                 cpo.id,
                 CONVERT_TZ(cpo.event_date, '+00:00', 'Asia/Jakarta') AS event_date,
                 cpo.event_name AS eventName,
@@ -452,18 +388,86 @@ const getPreorders = async (req, res) => {
             LEFT JOIN 
                 canteen_preorder_detail cpod ON cpo.id = cpod.preorder_id
             WHERE
-                cpo.faculty_id = ?
-                ${filterStatusQuery}
-                ${isHistory ? '' : excludeRejectedBySystemQuery}
+                1 = 1
+        `;
+
+        if (
+            isEqual(req.user.role, ROLES.DEKAN) ||
+            isEqual(req.user.role, ROLES.TU)
+        ) {
+            countQuery += `
+                AND cpo.unit = ?
+            `;
+            dataQuery += `
+                AND cpo.unit = ?
+            `;
+            queryParams.push(req.user.unit);
+        }
+
+        let filterStatusQuery = '';
+
+        if (isHistory) {
+            filterStatusQuery = `
+                AND cpo.status IN ('${PO_STAT.DONE}', '${PO_STAT.REJECT_BY_SYSTEM}')    
+            `;
+        } else {
+            if (isEqual(role, ROLES.SDM)) {
+                // Filter for BAK role: Preorders with status 'Menunggu Persetujuan SDM' in status history
+                filterStatusQuery = `
+                    AND EXISTS (
+                        SELECT 1
+                        FROM canteen_preorder_status_history cposh
+                        WHERE cposh.preorder_id = cpo.id
+                        AND cposh.status = '${replacePlaceholders(
+                            PO_STAT.PENDING,
+                            [ROLES.SDM]
+                        )}'
+                    )
+                    AND
+                        cpo.status = '${replacePlaceholders(PO_STAT.PENDING, [
+                            ROLES.SDM,
+                        ])}'
+                `;
+            } else if (isEqual(role, ROLES.ADMIN)) {
+                // Filter for Admin role: Only show preorders with status 'Menunggu Proses Kantin'
+                filterStatusQuery = `AND cpo.status = '${PO_STAT.CANTEEN_PROCESS}'`;
+            }
+        }
+
+        countQuery += `
+            ${filterStatusQuery}
+        `;
+        dataQuery += `
+            ${filterStatusQuery}
+        `;
+
+        const filterDate = `
+            AND DATE(CONVERT_TZ(cpo.event_date, '+00:00', 'Asia/Jakarta')) BETWEEN ? AND ?
+        `;
+
+        if (isHistory) {
+            countQuery += `
+                ${filterDate}
+            `;
+            dataQuery += `
+                ${filterDate}
+            `;
+            queryParams.push(from, to);
+        }
+
+        dataQuery += `
             GROUP BY 
                 cpo.id
             ORDER BY
                 cpo.id DESC
             LIMIT ${limit}
             OFFSET ${offset}
-            `,
-            [req.user.facultyId]
-        );
+        `;
+
+        const [countResult] = await db.execute(countQuery, queryParams);
+        const [rows] = await db.execute(dataQuery, queryParams);
+
+        const totalRecords = countResult[0].total;
 
         const pagination = buildPaginationData(limit, page, totalRecords);
 
@@ -1043,6 +1047,7 @@ const printInvoice = async (req, res) => {
             `SELECT
                 CONVERT_TZ(event_date, '+00:00', 'Asia/Jakarta') AS eventDate,
                 event_name AS eventName,
+                number,
                 unit
             FROM
                 canteen_preorders
@@ -1112,6 +1117,11 @@ const printInvoice = async (req, res) => {
             formatIndonesianDate(cpoRows[0].eventDate)
         );
         htmlTemplate = replaceString(htmlTemplate, '[UNIT]', cpoRows[0].unit);
+        htmlTemplate = replaceString(
+            htmlTemplate,
+            '[NUMBER]',
+            cpoRows[0].number
+        );
 
         await page.setContent(htmlTemplate);
 
@@ -1144,25 +1154,27 @@ const getSummary = async (req, res) => {
 
         // Data query for fetching results
         const dataQuery = `
-            SELECT 
-                CONVERT_TZ(cpo.event_date, '+00:00', 'Asia/Jakarta') AS eventDate,
-                COALESCE(cpo.unit, '') AS unit,
-                (SELECT COALESCE(SUM(cpod.qty), 0)
-                 FROM canteen_preorder_detail cpod
-                 WHERE cpod.preorder_id = cpo.id) AS totalQty,
-                (SELECT COALESCE(SUM(cpod.price), 0)
-                 FROM canteen_preorder_detail cpod
-                 WHERE cpod.preorder_id = cpo.id) AS totalPrice
-            FROM 
-                canteen_preorders cpo
-            WHERE 
-                DATE(CONVERT_TZ(cpo.event_date, '+00:00', 'Asia/Jakarta')) BETWEEN ? AND ?
-            AND
-                cpo.status = ?
-            ORDER BY 
-                CONVERT_TZ(cpo.event_date, '+00:00', 'Asia/Jakarta')
-            LIMIT ${perPage} OFFSET ${offset}
-        `;
+                SELECT 
+                    cpo.id,
+                    CONVERT_TZ(cpo.event_date, '+00:00', 'Asia/Jakarta') AS eventDate,
+                    cpo.event_name AS eventName,
+                    COALESCE(cpo.unit, '') AS unit,
+                    (SELECT COALESCE(SUM(cpod.qty), 0)
+                    FROM canteen_preorder_detail cpod
+                    WHERE cpod.preorder_id = cpo.id) AS totalQty,
+                    (SELECT COALESCE(SUM(cpod.qty * cpod.price), 0)
+                    FROM canteen_preorder_detail cpod
+                    WHERE cpod.preorder_id = cpo.id) AS totalPrice
+                FROM 
+                    canteen_preorders cpo
+                WHERE 
+                    DATE(CONVERT_TZ(cpo.event_date, '+00:00', 'Asia/Jakarta')) BETWEEN ? AND ?
+                AND
+                    cpo.status = ?
+                ORDER BY 
+                    CONVERT_TZ(cpo.event_date, '+00:00', 'Asia/Jakarta')
+                LIMIT ${perPage} OFFSET ${offset};
+            `;
 
         // Count query for pagination
         const countQuery = `
@@ -1175,7 +1187,7 @@ const getSummary = async (req, res) => {
                 cpo.status = ?
         `;
 
-        const queryParams = [PO_STAT.DONE, from, to];
+        const queryParams = [from, to, PO_STAT.DONE];
 
         // Execute the data query
         const [rows] = await db.execute(dataQuery, queryParams);
@@ -1192,6 +1204,8 @@ const getSummary = async (req, res) => {
         const response = {
             grandTotal: `Rp ${formatRupiah(grandTotal)}`,
             preorders: rows.map((row) => ({
+                id: row.id,
+                eventName: row.eventName,
                 eventDate: row.eventDate,
                 unit: row.unit,
                 totalQty: Number(row.totalQty) || 0,
@@ -1217,6 +1231,157 @@ const getSummary = async (req, res) => {
     }
 };
 
+const exportSummary = async (req, res) => {
+    try {
+        let { from, to } = req.query;
+
+        const [rows] = await db.execute(
+            `
+                SELECT 
+                    cpo.id,
+                    DATE_FORMAT(CONVERT_TZ(cpo.event_date, '+00:00', 'Asia/Jakarta'), '%e %b %Y') AS eventDate,
+                    cpo.event_name AS eventName,
+                    COALESCE(cpo.unit, '-') AS unit,
+                    (SELECT COALESCE(SUM(cpod.qty), 0)
+                    FROM canteen_preorder_detail cpod
+                    WHERE cpod.preorder_id = cpo.id) AS totalQty,
+                    (SELECT COALESCE(SUM(cpod.qty * cpod.price), 0)
+                    FROM canteen_preorder_detail cpod
+                    WHERE cpod.preorder_id = cpo.id) AS totalPrice
+                FROM 
+                    canteen_preorders cpo
+                WHERE 
+                    DATE(CONVERT_TZ(cpo.event_date, '+00:00', 'Asia/Jakarta')) BETWEEN ? AND ?
+                AND
+                    cpo.status = ?
+                ORDER BY 
+                    CONVERT_TZ(cpo.event_date, '+00:00', 'Asia/Jakarta')
+            `,
+            [from, to, PO_STAT.DONE]
+        );
+
+        const grandTotal = rows.reduce(
+            (acc, cpo) => acc + (Number(cpo.totalPrice) || 0),
+            0
+        );
+
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Summary');
+
+        const formattedFrom = moment(from)
+            .tz('Asia/Jakarta')
+            .format('D MMM YYYY');
+        const formattedTo = moment(to).tz('Asia/Jakarta').format('D MMM YYYY');
+        const mergedHeader = `Data ini diambil dari Rentang Waktu: ${formattedFrom} - ${formattedTo}`;
+
+        worksheet.addRow([mergedHeader]);
+        worksheet.getRow(1).font = { bold: true };
+        worksheet.getRow(1).alignment = {
+            vertical: 'middle',
+            horizontal: 'left',
+        };
+
+        worksheet.mergeCells('A1:E1');
+
+        worksheet.addRow([]);
+
+        const grandTotalRow = worksheet.addRow([
+            '',
+            '',
+            '',
+            '',
+            'Grand Total',
+            `Rp ${formatRupiah(grandTotal)}`,
+        ]);
+
+        worksheet.addRow([]);
+
+        worksheet.addRow([
+            'No',
+            'Nama Acara',
+            'Tanggal Acara',
+            'Unit',
+            'Jumlah Pesanan',
+            'Total',
+        ]);
+
+        worksheet.getRow(5).eachCell((cell) => {
+            cell.font = { bold: true };
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            cell.border = {
+                top: { style: 'thin' },
+                left: { style: 'thin' },
+                bottom: { style: 'thin' },
+                right: { style: 'thin' },
+            };
+        });
+
+        rows.forEach((row, index) => {
+            const newRow = worksheet.addRow([
+                index + 1,
+                row.eventName,
+                row.eventDate,
+                row.unit,
+                Number(row.totalQty) || 0 + ' Box',
+                `Rp ${formatRupiah(Number(row.totalPrice) || 0)}`,
+            ]);
+
+            newRow.eachCell((cell, colNumber) => {
+                cell.alignment = {
+                    vertical: 'middle',
+                    horizontal: colNumber === 2 ? 'left' : 'center', // 'Nama' and 'NIK' left, others center
+                };
+                cell.border = {
+                    top: { style: 'thin' },
+                    left: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    right: { style: 'thin' },
+                };
+            });
+        });
+
+        grandTotalRow.getCell(7).font = { bold: true };
+        grandTotalRow.alignment = {
+            vertical: 'middle',
+            horizontal: 'center',
+        };
+
+        let maxLength = 30;
+        rows.forEach((row) => {
+            const cellLength = row.eventName.length;
+            if (cellLength > maxLength) {
+                maxLength = cellLength + 5;
+            }
+        });
+
+        worksheet.getColumn(1).width = 10;
+        worksheet.getColumn(2).width = maxLength;
+        worksheet.getColumn(3).width = 20;
+        worksheet.getColumn(4).width = 15;
+        worksheet.getColumn(5).width = 15;
+        worksheet.getColumn(6).width = 30;
+        worksheet.getColumn(7).width = 15;
+
+        const filename =
+            'preorder_summary_' +
+            moment().tz('Asia/Jakarta').format('YYYYMMDDHHmmss');
+
+        const buffer = await workbook.xlsx.writeBuffer();
+
+        res.setHeader(
+            'Content-Disposition',
+            `attachment; filename="${filename}.xlsx"`
+        );
+        res.setHeader(
+            'Content-Type',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        );
+        res.send(buffer);
+    } catch (error) {
+        return serverErrorResponse(res, error);
+    }
+};
+
 module.exports = {
     submitPreorder,
     approvalPreorder,
@@ -1230,4 +1395,5 @@ module.exports = {
     finishPreorder,
     printInvoice,
     getSummary,
+    exportSummary,
 };
