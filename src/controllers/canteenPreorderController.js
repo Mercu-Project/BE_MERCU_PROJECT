@@ -431,6 +431,8 @@ const getPreorders = async (req, res) => {
             } else if (isEqual(role, ROLES.ADMIN)) {
                 // Filter for Admin role: Only show preorders with status 'Menunggu Proses Kantin'
                 filterStatusQuery = `AND cpo.status = '${PO_STAT.CANTEEN_PROCESS}'`;
+            } else {
+                filterStatusQuery = ` AND cpo.status NOT IN ('${PO_STAT.DONE}', '${PO_STAT.REJECT_BY_SYSTEM}') `;
             }
         }
 
