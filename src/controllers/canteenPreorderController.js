@@ -413,8 +413,7 @@ const getPreorders = async (req, res) => {
         } else {
             if (isEqual(role, ROLES.SDM)) {
                 // Filter for BAK role: Preorders with status 'Menunggu Persetujuan SDM' in status history
-                filterStatusQuery = `
-                    AND EXISTS (
+                /*  AND EXISTS (
                         SELECT 1
                         FROM canteen_preorder_status_history cposh
                         WHERE cposh.preorder_id = cpo.id
@@ -422,15 +421,44 @@ const getPreorders = async (req, res) => {
                             PO_STAT.PENDING,
                             [ROLES.SDM]
                         )}'
-                    )
-                    AND
-                        cpo.status = '${replacePlaceholders(PO_STAT.PENDING, [
+                    ) */
+                filterStatusQuery = `
+                    AND (
+                        cpo.status IN ('${replacePlaceholders(PO_STAT.PENDING, [
                             ROLES.SDM,
-                        ])}'
+                        ])}', '${PO_STAT.CANTEEN_PROCESS}')
+                        OR
+                        (
+                            cpo.status = '${replacePlaceholders(
+                                PO_STAT.REJECT,
+                                [ROLES.DEKAN]
+                            )}'
+                            AND
+                            EXISTS (
+                                SELECT 1
+                                FROM canteen_preorder_status_history cposh
+                                WHERE cposh.preorder_id = cpo.id
+                                AND cposh.status = '${replacePlaceholders(
+                                    PO_STAT.PENDING,
+                                    [ROLES.SDM]
+                                )}'
+                            )
+                        )
+                    )
                 `;
             } else if (isEqual(role, ROLES.ADMIN)) {
                 // Filter for Admin role: Only show preorders with status 'Menunggu Proses Kantin'
                 filterStatusQuery = `AND cpo.status = '${PO_STAT.CANTEEN_PROCESS}'`;
+            } else if (isEqual(role, ROLES.DEKAN)) {
+                filterStatusQuery = `
+                    AND cpo.status IN ('${replacePlaceholders(PO_STAT.PENDING, [
+                        ROLES.DEKAN,
+                    ])}', '${replacePlaceholders(PO_STAT.PENDING, [
+                    ROLES.SDM,
+                ])}',
+                '${PO_STAT.CANTEEN_PROCESS}'
+                )
+                `;
             } else {
                 filterStatusQuery = ` AND cpo.status NOT IN ('${PO_STAT.DONE}', '${PO_STAT.REJECT_BY_SYSTEM}') `;
             }
@@ -465,6 +493,10 @@ const getPreorders = async (req, res) => {
             LIMIT ${limit}
             OFFSET ${offset}
         `;
+
+        // console.log('dataQuery => ', dataQuery);
+        // console.log('countQuery => ', countQuery);
+        // console.log('queryParams => ', queryParams);
 
         const [countResult] = await db.execute(countQuery, queryParams);
         const [rows] = await db.execute(dataQuery, queryParams);
