@@ -1281,7 +1281,7 @@ const exportSummary = async (req, res) => {
             horizontal: 'left',
         };
 
-        worksheet.mergeCells('A1:E1');
+        worksheet.mergeCells('A1:F1');
 
         worksheet.addRow([]);
 
@@ -1293,6 +1293,8 @@ const exportSummary = async (req, res) => {
             'Grand Total',
             `Rp ${formatRupiah(grandTotal)}`,
         ]);
+
+        worksheet.getRow(3).getCell(5).font = { bold: true };
 
         worksheet.addRow([]);
 
@@ -1322,7 +1324,7 @@ const exportSummary = async (req, res) => {
                 row.eventName,
                 row.eventDate,
                 row.unit,
-                Number(row.totalQty) || 0 + ' Box',
+                row.totalQty + ' Box',
                 `Rp ${formatRupiah(Number(row.totalPrice) || 0)}`,
             ]);
 
