@@ -498,10 +498,10 @@ const getPreorders = async (req, res) => {
             OFFSET ${offset}
         `;
 
-        console.log('dataQuery => ', dataQuery);
-        console.log('countQuery => ', countQuery);
-        console.log('queryParams => ', queryParams);
-        console.log('req.query => ', req.query);
+        // console.log('dataQuery => ', dataQuery);
+        // console.log('countQuery => ', countQuery);
+        // console.log('queryParams => ', queryParams);
+        // console.log('req.query => ', req.query);
 
         const [countResult] = await db.execute(countQuery, queryParams);
         const [rows] = await db.execute(dataQuery, queryParams);
