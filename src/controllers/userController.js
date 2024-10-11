@@ -201,7 +201,14 @@ const editUser = async (req, res) => {
     let connection;
     try {
         const { username } = req.params;
-        const { newStatus, newUsername, newFullName, newUnit } = req.body;
+        const {
+            newStatus,
+            newUsername,
+            newFullName,
+            newUnit,
+            newCategory,
+            newPosition,
+        } = req.body;
 
         const [accountRow] = await db.execute(
             'SELECT id FROM accounts WHERE username = ?',
@@ -241,8 +248,15 @@ const editUser = async (req, res) => {
         }
 
         const [updateUser] = await db.execute(
-            'UPDATE users SET full_name = ?, status = ?, unit = ? WHERE account_id = ?',
-            [newFullName, newStatus, newUnit, accountRow[0].id]
+            'UPDATE users SET full_name = ?, status = ?, unit = ?, category = ?, jobPosition = ? WHERE account_id = ?',
+            [
+                newFullName,
+                newStatus,
+                newUnit,
+                newCategory,
+                newPosition,
+                accountRow[0].id,
+            ]
         );
 
         if (updateUser.affectedRows === 0) {
