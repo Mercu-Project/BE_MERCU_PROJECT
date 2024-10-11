@@ -40,7 +40,9 @@ const getUsers = async (req, res) => {
                 ELSE 'Tidak Aktif'
                 END AS status,
                 acc.username AS username,
-                u.unit
+                COALESCE(u.unit, '') AS unit,
+                COALESCE(u.jobPosition, '') AS jobPosition,
+                COALESCE(u.category, '') AS category
             FROM
                 users u
             JOIN accounts acc ON u.account_id = acc.id
