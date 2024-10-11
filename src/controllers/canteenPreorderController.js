@@ -429,10 +429,12 @@ const getPreorders = async (req, res) => {
                         ])}', '${PO_STAT.CANTEEN_PROCESS}')
                         OR
                         (
-                            cpo.status = '${replacePlaceholders(
+                            cpo.status IN ('${replacePlaceholders(
                                 PO_STAT.REJECT,
                                 [ROLES.DEKAN]
-                            )}'
+                            )}', '${replacePlaceholders(PO_STAT.REJECT, [
+                    ROLES.SDM,
+                ])}')
                             AND
                             EXISTS (
                                 SELECT 1
@@ -456,7 +458,9 @@ const getPreorders = async (req, res) => {
                     ])}', '${replacePlaceholders(PO_STAT.PENDING, [
                     ROLES.SDM,
                 ])}',
-                '${PO_STAT.CANTEEN_PROCESS}'
+                '${PO_STAT.CANTEEN_PROCESS}',
+                '${replacePlaceholders(PO_STAT.REJECT, [ROLES.DEKAN])}',
+                '${replacePlaceholders(PO_STAT.REJECT, [ROLES.SDM])}',
                 )
                 `;
             } else {
