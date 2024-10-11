@@ -475,7 +475,7 @@ const getPreorders = async (req, res) => {
             AND DATE(CONVERT_TZ(cpo.event_date, '+00:00', 'Asia/Jakarta')) BETWEEN ? AND ?
         `;
 
-        if (isHistory) {
+        if (from && to) {
             countQuery += `
                 ${filterDate}
             `;
@@ -497,6 +497,7 @@ const getPreorders = async (req, res) => {
         // console.log('dataQuery => ', dataQuery);
         // console.log('countQuery => ', countQuery);
         // console.log('queryParams => ', queryParams);
+        // console.log('req.query => ', req.query);
 
         const [countResult] = await db.execute(countQuery, queryParams);
         const [rows] = await db.execute(dataQuery, queryParams);
