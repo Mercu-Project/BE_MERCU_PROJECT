@@ -460,7 +460,7 @@ const getPreorders = async (req, res) => {
                 ])}',
                 '${PO_STAT.CANTEEN_PROCESS}',
                 '${replacePlaceholders(PO_STAT.REJECT, [ROLES.DEKAN])}',
-                '${replacePlaceholders(PO_STAT.REJECT, [ROLES.SDM])}',
+                '${replacePlaceholders(PO_STAT.REJECT, [ROLES.SDM])}'
                 )
                 `;
             } else {
