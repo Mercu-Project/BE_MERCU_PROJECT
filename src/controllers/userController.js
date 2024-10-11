@@ -41,7 +41,7 @@ const getUsers = async (req, res) => {
                 END AS status,
                 acc.username AS username,
                 COALESCE(u.unit, '') AS unit,
-                COALESCE(u.jobPosition, '') AS jobPosition,
+                COALESCE(u.jobPosition, '') AS position,
                 COALESCE(u.category, '') AS category
             FROM
                 users u
